@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: UNLICENSED
+
 pragma solidity ^0.8.0;
 
-// import Ialc_valut_v2.sol;
-// import Ierc-20.sol
+import {IalcV2alUSDVault} from "./interfaces/IalcV2alUSD.sol";
+import {Istreamer} from "./interfaces/Istreamer.sol";
 
 contract streamer {
     // creates a many to many bi-directionally lookup-able data structure
@@ -16,6 +18,7 @@ contract streamer {
     struct stream{
         uint256 cps;
         uint256 sinceLast;
+        uint256 freq;
     }
     // address of alcV2
     address public adrAlcV2;
@@ -47,7 +50,7 @@ contract streamer {
     }
 
     // create stream
-    function creatStream(uint256 _cps, address _to) external {
+    function creatStream(uint256 _cps, address _to, uint256 _freq) external {
         require(_to != address(0), "cannot stream to 0 address");
         require(_cps > 0, "should not stream 0 coins");
         // fromTo
@@ -55,24 +58,27 @@ contract streamer {
         // toFrom
         toFrom[_to].push(msg.sender);
         // gets
-        gets[msg.sender][_to] = stream(_cps, block.timestamp);
+        gets[msg.sender][_to] = stream(_cps, block.timestamp, _freq);
     }
 
     // close stream
     function closeStream(address _to) external {
         require(_to != address(0), "cannot stream to 0 address");
         // gets
-        gets[msg.sender][_to] = stream(0, block.timestamp);
+        gets[msg.sender][_to] = stream(0, block.timestamp, 0);
     }
 
     // draw down from stream
     function drawDown() external {
         uint256 total;
         uint256 change;
+        stream _temp;
         for(uint256 i=0; i < toFrom[msg.sender].length; i++){
-            change = block.timestamp - gets[toFrom[msg.sender][i]][msg.sender].sinceLast;
-            total += change * gets[toFrom[msg.sender][i]][msg.sender].cps;
+            temp = gets[toFrom[msg.sender][i]][msg.sender];
+            if(block.timestamp < temp.freq + temp.sinceLast){break;}
+            change = block.timestamp - temp.sinceLast;
+            total += change * temp.cps;
         }
-        // transfer the funds here
+        IalcV2alUSDVault(adrAlcV2).mint(total, msg.sender);
     }
 }
