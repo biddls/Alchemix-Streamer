@@ -8,6 +8,7 @@ import {Istreamer} from "./interfaces/Istreamer.sol";
 contract streamer {
     // creates a many to many bi-directionally lookup-able data structure
     // from -> to
+    // not sure if this one is needed but no harm in keeping it around
     mapping(address => address[]) public fromTo;
     // to -> from
     mapping(address => address[]) public toFrom;
@@ -68,8 +69,8 @@ contract streamer {
         gets[msg.sender][_to] = stream(0, block.timestamp, 0);
     }
 
-    // draw down from stream
-    function drawDown() external {
+    // draw down from stream //temp adj for testing
+    function drawDown() external returns(uint256){
         uint256 total;
         uint256 change;
         stream memory _temp;
@@ -79,6 +80,7 @@ contract streamer {
             change = block.timestamp - _temp.sinceLast;
             total += change * _temp.cps;
         }
-        IalcV2Vault(adrAlcV2).mint(total, msg.sender);
+//        IalcV2Vault(adrAlcV2).mint(total, msg.sender);
+        return total;
     }
 }

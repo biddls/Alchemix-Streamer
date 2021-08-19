@@ -14,7 +14,7 @@ interface Istreamer {
     function admin() external;
 
     // create stream
-    function creatStream(uint256 _cps, address _to) external;
+    function creatStream(uint256 _cps, address _to, uint256 _freq) external;
 
     // close stream
     function closeStream(address _to) external;
