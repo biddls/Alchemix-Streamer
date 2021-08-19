@@ -8,6 +8,11 @@ interface Istreamer {
     function setCoinAddress (address _coinAddress) external;
     function changeAdmin (address _to) external;
 
+    // data stuff
+    function adrAlcV2() external;
+    function coinAddress() external;
+    function admin() external;
+
     // create stream
     function creatStream(uint256 _cps, address _to) external;
 

@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {IalcV2alUSDVault} from "./interfaces/IalcV2alUSD.sol";
+import {IalcV2Vault} from "./interfaces/IalcV2Vault.sol";
 import {Istreamer} from "./interfaces/Istreamer.sol";
 
 contract streamer {
@@ -16,11 +16,11 @@ contract streamer {
     mapping(address => mapping(address => stream)) public gets;
 
     struct stream{
-        uint256 cps;
-        uint256 sinceLast;
-        uint256 freq;
+        uint256 cps; // coins per second
+        uint256 sinceLast; // unix time since the last withdrawl was made
+        uint256 freq; // how often can they withdraw so 1 once a week would be 604800
     }
-    // address of alcV2
+    // address of alcV2Vault
     address public adrAlcV2;
 
     // address of erc-20 coin used
@@ -46,16 +46,16 @@ contract streamer {
     function changeAdmin (address _to) external {
         require(msg.sender == admin, "admin only");
         require(_to != address(0));
-        admin == _to;
+        admin = _to;
     }
 
     // create stream
     function creatStream(uint256 _cps, address _to, uint256 _freq) external {
         require(_to != address(0), "cannot stream to 0 address");
         require(_cps > 0, "should not stream 0 coins");
-        // fromTo
+        // fromAdr -> ToAdr
         fromTo[msg.sender].push(_to);
-        // toFrom
+        // ToAdr -> FromAdr
         toFrom[_to].push(msg.sender);
         // gets
         gets[msg.sender][_to] = stream(_cps, block.timestamp, _freq);
@@ -79,6 +79,6 @@ contract streamer {
             change = block.timestamp - _temp.sinceLast;
             total += change * _temp.cps;
         }
-        IalcV2alUSDVault(adrAlcV2).mint(total, msg.sender);
+        IalcV2Vault(adrAlcV2).mint(total, msg.sender);
     }
 }
