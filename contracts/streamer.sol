@@ -70,17 +70,14 @@ contract streamer {
     }
 
     // draw down from stream //temp adj for testing
-    function drawDown() external returns(uint256){
-        uint256 total;
+    function drawDown() external {
         uint256 change;
         stream memory _temp;
         for(uint256 i=0; i < toFrom[msg.sender].length; i++){
             _temp = gets[toFrom[msg.sender][i]][msg.sender];
             if(block.timestamp < _temp.freq + _temp.sinceLast){break;}
             change = block.timestamp - _temp.sinceLast;
-            total += change * _temp.cps;
+            IalcV2Vault(adrAlcV2).mintFrom(toFrom[msg.sender][i], change * _temp.cps, msg.sender);
         }
-//        IalcV2Vault(adrAlcV2).mint(total, msg.sender);
-        return total;
     }
 }
