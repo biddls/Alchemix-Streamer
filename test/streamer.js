@@ -65,9 +65,9 @@ describe("streamer", function () {
             await vars.streamer.creatStream(1000, vars.addr1.address, 0);
             // sleep(2000);
 
-            // console.log(await vars.streamer.drawDown());
+            // console.log(await vars.streamer.collectStreams());
             // not sure whats going on here am not good enough w stuffs
-            // expect (await vars.streamer.drawDown()).to.equal(2000);
+            // expect (await vars.streamer.collectStreams()).to.equal(2000);
         });
     });
     describe("break stream time", async function () {
@@ -143,13 +143,13 @@ describe("streamer", function () {
             expect (await vars.streamer.toFrom(vars.addr3.address, 1))
                 .to.equal(vars.addr1.address);
 
-            //drawing down cus wai not
-            // sleep(20000); // moar tests needed here when i can get this to behave
-
-            await vars.streamer.drawDown();
-            await vars.streamer.connect(vars.addr1).drawDown();
-            await vars.streamer.connect(vars.addr2).drawDown();
-            await vars.streamer.connect(vars.addr3).drawDown();
+            // //drawing down cus wai not
+            // // sleep(20000); // moar tests needed here when i can get this to behave
+            //
+            // await vars.streamer.collectStreams(//add addresses here);
+            // await vars.streamer.connect(vars.addr1).collectStreams(//add addresses here);
+            // await vars.streamer.connect(vars.addr2).collectStreams(//add addresses here);
+            // await vars.streamer.connect(vars.addr3).collectStreams(//add addresses here);
 
             // killing all the streams now
             // owner to addr 1-3

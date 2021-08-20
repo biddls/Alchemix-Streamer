@@ -20,5 +20,5 @@ interface Istreamer {
     function closeStream(address _to) external;
 
     // draw down from stream
-    function drawDown() external;
+    function collectStreams() external;
 }
