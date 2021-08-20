@@ -20,6 +20,8 @@ contract streamer {
         uint256 cps; // coins per second
         uint256 sinceLast; // unix time since the last withdrawl was made
         uint256 freq; // how often can they withdraw so 1 once a week would be 604800
+        bool openDrawDown; //
+        mapping(address => bool) approved;
     }
     // address of alcV2Vault
     address public adrAlcV2;
@@ -51,7 +53,8 @@ contract streamer {
     }
 
     // create stream
-    function creatStream(uint256 _cps, address _to, uint256 _freq) external {
+    function creatStream(uint256 _cps, address _to, uint256 _freq, bool _openDrawDown, address[] memory _approvals) external {
+        if(_openDrawDown){require(_approvals.count == 0);}
         require(_to != address(0), "cannot stream to 0 address");
         require(_cps > 0, "should not stream 0 coins");
 //        // fromAdr -> ToAdr
@@ -59,28 +62,38 @@ contract streamer {
         // ToAdr -> FromAdr
         toFrom[_to].push(msg.sender);
         // gets
-        gets[msg.sender][_to] = stream(_cps, block.timestamp, _freq);
-        emit streamStarted(_to, block.timestamp, _cps, _freq);
+        gets[msg.sender][_to] = stream(_cps, block.timestamp, _freq, _openDrawDown, _approvals); // need to work on this
+        emit streamStarted(msg.sender, _to);
     }
 
     // close stream
     function closeStream(address _to) external {
         require(_to != address(0), "cannot stream to 0 address");
+        require(0 < gets[msg.sender][_to].cps);
         // gets
         gets[msg.sender][_to] = stream(0, block.timestamp, 0);
         emit streamClosed(_to, block.timestamp);
     }
 
     // draw down from stream //temp adj for testing
-    function collectStreams(address[] arrayOfStreamers) external {
-        for(uint256 i=0; i < arrayOfStreamers.length; i++){
-            stream memory _temp = gets[arrayOfStreamers[i]][msg.sender];
-            if(block.timestamp < _temp.freq + _temp.sinceLast){break;}
-//            IalcV2Vault(adrAlcV2).mintFrom(toFrom[msg.sender][i], (block.timestamp - _temp.sinceLast) * _temp.cps, msg.sender);
-            gets[arrayOfStreamers[i]][msg.sender].sinceLast = block.timestamp;
+    function drainStreams(address _to, address[] _arrayOfStreamers, uint256[] _amounts) external {
+        uint256 _amount;
+        for(uint256 i=0; i < _arrayOfStreamers.length; i++){
+            stream memory _temp = gets[_arrayOfStreamers[i]][_to];
+            if((!_temp.openDrawDown && _temp.approved[msg.sender]) || _temp.openDrawDown){ // if (closed but your on the list your fine) or your open
+                if(block.timestamp >= _temp.freq + _temp.sinceLast){
+                    _amount = (block.timestamp - _temp.sinceLast) * _temp.cps;
+                    if(_amounts[i] <= _amount && _amounts[i] > 0){
+                        _amount = _amounts[i];
+                    }
+//                    IalcV2Vault(adrAlcV2).mintFrom(toFrom[_to][i], _amount, _to);
+                    gets[_arrayOfStreamers[i]][_to].sinceLast = block.timestamp;
+                }
+            }
         }
     }
 
+    /*
     uint256 gasPerLazyLoop = 100000;
     mapping(address => uint256) lastPlace;
 
@@ -102,13 +115,11 @@ contract streamer {
         lastPlace[msg.sender] = 0;
         // emmit event to say all the addresses are checked
     }
+    */
 
     event streamStarted (
-//        address indexed from, // not sure if this one is needed
-        address indexed to,
-        uint256 indexed when,
-        uint256 cps,
-        uint256 freq
+        address indexed from,
+        address indexed to
     );
 
     event streamClosed (
