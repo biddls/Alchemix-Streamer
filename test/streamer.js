@@ -71,7 +71,7 @@ describe("streamer", function () {
         });
     });
     describe("break stream time", async function () {
-        it("Making lots a streams", async function () {
+        it("dai stream i will break u", async function () {
             // owner to addr 1-3
             await vars.streamer.creatStream(1, vars.addr1.address, 7);
             await vars.streamer.creatStream(2, vars.addr2.address, 8);
@@ -142,6 +142,53 @@ describe("streamer", function () {
                 .to.equal(vars.addr1.address);
             expect (await vars.streamer.toFrom(vars.addr3.address, 1))
                 .to.equal(vars.addr1.address);
+
+            //drawing down cus wai not
+            // sleep(20000); // moar tests needed here when i can get this to behave
+
+            await vars.streamer.drawDown();
+            await vars.streamer.connect(vars.addr1).drawDown();
+            await vars.streamer.connect(vars.addr2).drawDown();
+            await vars.streamer.connect(vars.addr3).drawDown();
+
+            // killing all the streams now
+            // owner to addr 1-3
+            await vars.streamer.closeStream(vars.addr1.address);
+            await vars.streamer.closeStream(vars.addr2.address);
+            await vars.streamer.closeStream(vars.addr3.address);
+
+            // addr1 to owner and addr 2-3
+            await vars.streamer.connect(vars.addr1)
+                .closeStream(vars.owner.address);
+            await vars.streamer.connect(vars.addr1)
+                .closeStream(vars.addr2.address);
+            await vars.streamer.connect(vars.addr1)
+                .closeStream(vars.addr3.address);
+
+            // making sure the streaming info is working
+            // owner accounts
+            expect ((await vars.streamer.gets(
+                vars.owner.address, vars.addr1.address))[0])
+                .to.equal(BigInt("0"));
+            expect ((await vars.streamer.gets(
+                vars.owner.address, vars.addr2.address))[0])
+                .to.equal(BigInt("0"));
+            expect ((await vars.streamer.gets(
+                vars.owner.address, vars.addr3.address))[0])
+                .to.equal(BigInt("0"));
+
+            // addr1 accounts
+            expect ((await vars.streamer.gets(
+                vars.addr1.address, vars.owner.address))[0])
+                .to.equal(BigInt("0"));
+            expect ((await vars.streamer.gets(
+                vars.addr1.address, vars.addr2.address))[0])
+                .to.equal(BigInt("0"));
+            expect ((await vars.streamer.gets(
+                vars.addr1.address, vars.addr3.address))[0])
+                .to.equal(BigInt("0"));
+
+            // bi-directional searching tests are not needed as it doesnt change that data
         })
     })
 });
