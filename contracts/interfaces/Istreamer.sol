@@ -42,13 +42,13 @@ interface Istreamer {
     ) external;
 
     // approval management
-    function revokeApprovals(
+    function revokeApprovals( // TESTED
         address _fromAddr,
         address[] memory _addresses
     ) external;
 
-    function grantApprovals(
-        address _fromAddr,
+    function grantApprovals( // TESTED
+        address _toAddr,
         address[] memory _addresses
     ) external;
 }

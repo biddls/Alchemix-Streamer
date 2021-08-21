@@ -68,11 +68,11 @@ describe("streamer", function () {
         it("Drawing down", async function () {
             await vars.streamer.creatStream(1000,
                 vars.addr1.address,0, false, []);
-            // sleep(2000);
+            sleep(2000);
 
-            // console.log(await vars.streamer.collectStreams());
+            console.log(await vars.streamer.collectStreams());
             // not sure whats going on here am not good enough w stuffs
-            // expect (await vars.streamer.collectStreams()).to.equal(2000);
+            expect (await vars.streamer.collectStreams()).to.equal(2000);
         });
     });
     describe("break stream time", async function () {
@@ -166,6 +166,43 @@ describe("streamer", function () {
                 .to.equal(BigInt("0"));
 
             // bi-directional searching tests are not needed as it doesnt change that data
-        })
-    })
+        });
+    });
+    describe ("Approvals management", async function () {
+        it ("Revoke and grant approval", async function () {
+            await vars.streamer.creatStream(
+                1, vars.addr1.address, 0,
+                false, [vars.owner.address,
+                    vars.addr1.address,
+                    vars.addr2.address]);
+
+            await vars.streamer.drainStreams(vars.addr1.address,
+                [vars.owner.address],
+                [1]);
+            await vars.streamer.connect(vars.addr1).drainStreams(vars.addr1.address,
+                [vars.owner.address],
+                [1]);
+            await vars.streamer.connect(vars.addr2).drainStreams(vars.addr1.address,
+                [vars.owner.address],
+                [1]);
+
+            // revoke
+            await vars.streamer.revokeApprovals(
+                vars.owner.address,
+                [vars.addr2.address]
+            );
+            await vars.streamer.connect(vars.addr2).drainStreams(vars.addr1.address,
+                [vars.owner.address],
+                [1]);
+
+            // approve
+            await vars.streamer.grantApprovals(
+                vars.owner.address,
+                [vars.addr2.address]
+            );
+            await vars.streamer.connect(vars.addr2).drainStreams(vars.addr1.address,
+                [vars.owner.address],
+                [1]);
+        });
+    });
 });

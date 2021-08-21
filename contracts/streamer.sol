@@ -110,15 +110,15 @@ contract streamer {
         }
     }
 
-    function revokeApprovals(address _fromAddr, address[] memory _addresses) external {
-        uint256 _streamID = gets[_fromAddr][msg.sender].ID;
+    function revokeApprovals(address _toAddr, address[] memory _addresses) external {
+        uint256 _streamID = gets[msg.sender][_toAddr].ID;
         for(uint256 i=0; i < _addresses.length; i++){
             addressIndex[_streamID][_addresses[i]] = false;
         }
     }
 
-    function grantApprovals(address _fromAddr, address[] memory _addresses) external {
-        uint256 _streamID = gets[_fromAddr][msg.sender].ID;
+    function grantApprovals(address _toAddr, address[] memory _addresses) external {
+        uint256 _streamID = gets[msg.sender][_toAddr].ID;
         for(uint256 i=0; i < _addresses.length; i++){
             addressIndex[_streamID][_addresses[i]] = true;
         }
