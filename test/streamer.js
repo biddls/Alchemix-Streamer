@@ -70,9 +70,12 @@ describe("streamer", function () {
                 vars.addr1.address,0, false, []);
             sleep(2000);
 
-            console.log(await vars.streamer.collectStreams());
-            // not sure whats going on here am not good enough w stuffs
-            expect (await vars.streamer.collectStreams()).to.equal(2000);
+            await expect(vars.streamer.drainStreams(
+                vars.addr1.address,
+                [vars.owner.address],
+                [2000]))
+                .to.emit(vars.streamer, 'streamDrawDown')
+                .withArgs(vars.addr1.address, 2000);
         });
     });
     describe("break stream time", async function () {

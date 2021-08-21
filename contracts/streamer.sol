@@ -77,18 +77,19 @@ contract streamer {
         for(uint256 i=0; i < _approvals.length; i++){
             addressIndex[streams][_approvals[i]] = true;
         }
-        emit streamStarted(msg.sender, _to);
+        emit streamStarted(msg.sender, _to, streams);
         streams += 1;
     }
 
     // close stream
     function closeStream(address _to) external {
         require(_to != address(0), "cannot stream to 0 address");
-        require(0 < gets[msg.sender][_to].cps);
+        stream memory _temp = gets[msg.sender][_to];
+        require(0 < _temp.cps);
         // gets
         gets[msg.sender][_to].cps = 0;
         gets[msg.sender][_to].sinceLast = block.timestamp;
-        emit streamClosed(_to, block.timestamp);
+        emit streamClosed(msg.sender, _to, _temp.ID);
     }
 
     // draw down from stream //temp adj for testing
@@ -105,6 +106,7 @@ contract streamer {
                     }
 //                    IalcV2Vault(adrAlcV2).mintFrom(toFrom[_to][i], _amount, _to);
                     gets[_arrayOfStreamers[i]][_to].sinceLast = block.timestamp;
+                    emit streamDrawDown(_to, _amount);
                 }
             }
         }
@@ -149,13 +151,19 @@ contract streamer {
     */
 
     event streamStarted (
-        address indexed from,
-        address indexed to
+        address from,
+        address to,
+        uint256 indexed ID
     );
 
     event streamClosed (
-    //        address indexed from, // not sure if this one is needed
-        address indexed to,
-        uint256 indexed when
+        address from, // not sure if this one is needed
+        address to,
+        uint256 indexed ID
+    );
+
+    event streamDrawDown (
+        address to,
+        uint256 ammount
     );
 }
