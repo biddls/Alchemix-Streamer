@@ -7,11 +7,13 @@ import {Istreamer} from "./interfaces/Istreamer.sol";
 
 contract streamer {
     // creates a many to many bi-directionally lookup-able data structure
+    /*
 //    // from -> to
-//    // not sure if this one is needed but no harm in keeping it around
+//    // not sure if its is needed but no harm in keeping it around
 //    mapping(address => address[]) public fromTo;
-    // to -> from
-    mapping(address => address[]) public toFrom;
+//    // to -> from
+//    mapping(address => address[]) public toFrom;
+    */
     // how much an address gets
     // fromAdr -> toAdr -> amount
     mapping(address => mapping(address => stream)) public gets;
@@ -21,8 +23,15 @@ contract streamer {
         uint256 sinceLast; // unix time since the last withdrawl was made
         uint256 freq; // how often can they withdraw so 1 once a week would be 604800
         bool openDrawDown; //
-        mapping(address => bool) approved;
+        uint256 ID;
     }
+
+    // get stream index so that the ID system works
+    uint256 internal streams;
+
+    // mby needed to help keep trac
+    mapping(uint256 => mapping(address => bool)) internal addressIndex;
+
     // address of alcV2Vault
     address public adrAlcV2;
 
@@ -54,16 +63,22 @@ contract streamer {
 
     // create stream
     function creatStream(uint256 _cps, address _to, uint256 _freq, bool _openDrawDown, address[] memory _approvals) external {
-        if(_openDrawDown){require(_approvals.count == 0);}
+        if(_openDrawDown){require(_approvals.length == 0);}
         require(_to != address(0), "cannot stream to 0 address");
         require(_cps > 0, "should not stream 0 coins");
-//        // fromAdr -> ToAdr
-//        fromTo[msg.sender].push(_to);
+        /*
+        // fromAdr -> ToAdr
+        fromTo[msg.sender].push(_to);
         // ToAdr -> FromAdr
         toFrom[_to].push(msg.sender);
+        */
         // gets
-        gets[msg.sender][_to] = stream(_cps, block.timestamp, _freq, _openDrawDown, _approvals); // need to work on this
+        gets[msg.sender][_to] = stream(_cps, block.timestamp, _freq, _openDrawDown, streams); // need to work on this
+        for(uint256 i=0; i < _approvals.length; i++){
+            addressIndex[streams][_approvals[i]] = true;
+        }
         emit streamStarted(msg.sender, _to);
+        streams += 1;
     }
 
     // close stream
@@ -71,16 +86,18 @@ contract streamer {
         require(_to != address(0), "cannot stream to 0 address");
         require(0 < gets[msg.sender][_to].cps);
         // gets
-        gets[msg.sender][_to] = stream(0, block.timestamp, 0);
+        gets[msg.sender][_to].cps = 0;
+        gets[msg.sender][_to].sinceLast = block.timestamp;
         emit streamClosed(_to, block.timestamp);
     }
 
     // draw down from stream //temp adj for testing
-    function drainStreams(address _to, address[] _arrayOfStreamers, uint256[] _amounts) external {
+    function drainStreams(address _to, address[] memory _arrayOfStreamers, uint256[] memory _amounts) external {
         uint256 _amount;
         for(uint256 i=0; i < _arrayOfStreamers.length; i++){
             stream memory _temp = gets[_arrayOfStreamers[i]][_to];
-            if((!_temp.openDrawDown && _temp.approved[msg.sender]) || _temp.openDrawDown){ // if (closed but your on the list your fine) or your open
+            if((!_temp.openDrawDown && addressIndex[_temp.ID][msg.sender]) ||
+                _temp.openDrawDown){ // if (closed but your on the list your fine) or your open
                 if(block.timestamp >= _temp.freq + _temp.sinceLast){
                     _amount = (block.timestamp - _temp.sinceLast) * _temp.cps;
                     if(_amounts[i] <= _amount && _amounts[i] > 0){
@@ -90,6 +107,20 @@ contract streamer {
                     gets[_arrayOfStreamers[i]][_to].sinceLast = block.timestamp;
                 }
             }
+        }
+    }
+
+    function revokeApprovals(address _fromAddr, address[] memory _addresses) external {
+        uint256 _streamID = gets[_fromAddr][msg.sender].ID;
+        for(uint256 i=0; i < _addresses.length; i++){
+            addressIndex[_streamID][_addresses[i]] = false;
+        }
+    }
+
+    function grantApprovals(address _fromAddr, address[] memory _addresses) external {
+        uint256 _streamID = gets[_fromAddr][msg.sender].ID;
+        for(uint256 i=0; i < _addresses.length; i++){
+            addressIndex[_streamID][_addresses[i]] = true;
         }
     }
 
