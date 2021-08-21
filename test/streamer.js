@@ -74,7 +74,7 @@ describe("streamer", function () {
                 vars.addr1.address,
                 [vars.owner.address],
                 [2000]))
-                .to.emit(vars.streamer, 'streamDrawDown')
+                .to.emit(vars.streamer, 'streamDrain')
                 .withArgs(vars.addr1.address, 2000);
         });
     });

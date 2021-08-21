@@ -8,6 +8,10 @@ const testing = async function() {
     let contract = await ethers.getContractFactory("streamer");
     const streamer = await contract.deploy();
 
+    // streamer.changeAlcV2(addr1.address);
+    // streamer.setCoinAddress(addr2.address);
+    // streamer.changeAdmin(addr3.address);
+
     return {
         streamer: streamer,
         balance: balance,

@@ -1,19 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 
+
+
 pragma solidity ^0.8.0;
 
 import {IalcV2Vault} from "./interfaces/IalcV2Vault.sol";
 import {Istreamer} from "./interfaces/Istreamer.sol";
 
 contract streamer {
-    // creates a many to many bi-directionally lookup-able data structure
-    /*
-//    // from -> to
-//    // not sure if its is needed but no harm in keeping it around
-//    mapping(address => address[]) public fromTo;
-//    // to -> from
-//    mapping(address => address[]) public toFrom;
-    */
     // how much an address gets
     // fromAdr -> toAdr -> amount
     mapping(address => mapping(address => stream)) public gets;
@@ -62,7 +56,9 @@ contract streamer {
     }
 
     // create stream
-    function creatStream(uint256 _cps, address _to, uint256 _freq, bool _openDrawDown, address[] memory _approvals) external {
+    function creatStream(
+        uint256 _cps, address _to, uint256 _freq, bool _openDrawDown, address[] memory _approvals
+    ) external {
         if(_openDrawDown){require(_approvals.length == 0);}
         require(_to != address(0), "cannot stream to 0 address");
         require(_cps > 0, "should not stream 0 coins");
@@ -106,7 +102,7 @@ contract streamer {
                     }
 //                    IalcV2Vault(adrAlcV2).mintFrom(toFrom[_to][i], _amount, _to);
                     gets[_arrayOfStreamers[i]][_to].sinceLast = block.timestamp;
-                    emit streamDrawDown(_to, _amount);
+                    emit streamDrain(_to, _amount);
                 }
             }
         }
@@ -126,30 +122,6 @@ contract streamer {
         }
     }
 
-    /*
-    uint256 gasPerLazyLoop = 100000;
-    mapping(address => uint256) lastPlace;
-
-    // draw down from stream //temp adj for testing
-    // smart loop
-    function collectStreamsLazy() external {
-        uint256 change;
-        stream memory _temp;
-        for(uint256 i=lastPlace[msg.sender]; i < toFrom[msg.sender].length; i++){
-            _temp = gets[toFrom[msg.sender][i]][msg.sender];
-            if(block.timestamp < _temp.freq + _temp.sinceLast){break;}
-            change = block.timestamp - _temp.sinceLast;
-//            IalcV2Vault(adrAlcV2).mintFrom(toFrom[msg.sender][i], change * _temp.cps, msg.sender);
-            if(gasleft() < gasPerLazyLoop){
-                lastPlace[msg.sender] = i;
-                return;
-            }
-        }
-        lastPlace[msg.sender] = 0;
-        // emmit event to say all the addresses are checked
-    }
-    */
-
     event streamStarted (
         address from,
         address to,
@@ -162,7 +134,7 @@ contract streamer {
         uint256 indexed ID
     );
 
-    event streamDrawDown (
+    event streamDrain (
         address to,
         uint256 ammount
     );
