@@ -5,6 +5,11 @@ require('hardhat-spdx-license-identifier');
 
 module.exports = {
   defaultNetwork: "hardhat",
+  networks: {
+    hardhat: {
+      initialBaseFeePerGas: 0
+    }
+  },
   solidity: {
     version: "0.8.7",
     settings: {

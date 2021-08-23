@@ -1,3 +1,33 @@
+// SPDX-License-Identifier: UNLICENSED
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 pragma solidity ^0.8.0;
 
 import {IalcV2Vault} from "./interfaces/IalcV2Vault.sol";
@@ -8,7 +38,6 @@ contract streamer {
     // fromAdr -> toAdr -> amount
     mapping(address => mapping(address => stream)) public gets;
 
-    IalcV2Vault public vault;
 
     struct stream{
         uint256 cps; // coins per second
@@ -24,8 +53,9 @@ contract streamer {
     // mby needed to help keep trac
     mapping(uint256 => mapping(address => bool)) internal addressIndex;
 
-    // address of alcV2Vault
+    // vault info
     address public adrAlcV2;
+    IalcV2Vault public vault;
 
     // address of erc-20 coin used
     address public coinAddress;
@@ -37,21 +67,24 @@ contract streamer {
         admin = msg.sender;
     }
 
-    function changeAlcV2 (address _new, address _vaultAddr) external {
+    function changeAlcV2 (address _new) external {
         require(msg.sender == admin, "admin only");
         adrAlcV2 = _new;
-        vault = IalcV2Vault(_vaultAddr);
+        vault = IalcV2Vault(_new);
+        emit changedAlcV2(_new);
     }
 
-    function setCoinAddress (address _coinAddress) external {
+    function setCoinAddress (address _new) external {
         require(msg.sender == admin, "admin only");
-        coinAddress = _coinAddress;
+        coinAddress = _new;
+        emit coinAddressChanged(_new);
     }
 
-    function changeAdmin (address _to) external {
+    function changeAdmin (address _new) external {
         require(msg.sender == admin, "admin only");
-        require(_to != address(0));
-        admin = _to;
+        require(_new != address(0));
+        admin = _new;
+        emit adminChanged(_new);
     }
 
     // create stream
@@ -88,9 +121,9 @@ contract streamer {
     }
 
     // draw down from stream //temp adj for testing
-    function drainStreams(address _to,
-        address[] memory _arrayOfStreamers,
-        uint256[] memory _amounts) external {
+    function drainStreams(address _to, // address that receives
+        address[] memory _arrayOfStreamers, // addresses that feed into _to
+        uint256[] memory _amounts) external { // the amount of coins they want to draw down from each address
 
         uint256 _amount;
 
@@ -108,19 +141,20 @@ contract streamer {
                         _amount = _amounts[i];
                     }
 
-//                    (bool success, bytes memory returnData) =
-//                    address(token).call(
-//                        abi.encodePacked(
-//                            vault.mintFrom.selector,
-//                            abi.encode(toFrom[_to][i], _amount, _to)));
+                    (bool success, bytes memory returnData) =
+                    address(adrAlcV2).call(
+                        abi.encodePacked(
+                            vault.mintFrom.selector,
+                            abi.encode(_arrayOfStreamers[i], _amount, _to)));
 
-//                    if (success) {
-                    gets[_arrayOfStreamers[i]][_to].sinceLast = block.timestamp;
-                    emit streamDrain(_to, _amount);
-//                    }
+                    if (success) {
+                        gets[_arrayOfStreamers[i]][_to].sinceLast = block.timestamp;
+                        _arrayOfStreamers[i] = address(0);
+                    }
                 }
             }
         }
+        emit streamDrain(_arrayOfStreamers);
     }
 
     function revokeApprovals(address _toAddr, address[] memory _addresses) external {
@@ -150,7 +184,18 @@ contract streamer {
     );
 
     event streamDrain (
-        address to,
-        uint256 ammount
+        address[] failed // 0 addresses are to be ignored
+    );
+
+    event changedAlcV2 (
+        address indexed newAddr
+    );
+
+    event coinAddressChanged (
+        address indexed newAddr
+    );
+
+    event adminChanged (
+        address indexed newAddr
     );
 }

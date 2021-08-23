@@ -1,6 +1,6 @@
 const { expect } = require("chai");
 const { testing } = require("../script/testing.js");
-const {BigNumber} = require("ethers");
+
 
 function sleep(milliseconds) {
     const start = Date.now();
@@ -24,9 +24,17 @@ describe("streamer", function () {
         });
         it("Admin tooling tests", async function () {
             // setting new addresses
-            await vars.streamer.changeAlcV2(vars.addr1.address);
-            await vars.streamer.setCoinAddress(vars.addr2.address);
-            await vars.streamer.changeAdmin(vars.addr3.address);
+            await expect(vars.streamer.changeAlcV2(vars.addr1.address))
+                .to.emit(vars.streamer, 'changedAlcV2')
+                .withArgs(vars.addr1.address);
+
+            await expect(vars.streamer.setCoinAddress(vars.addr2.address))
+                .to.emit(vars.streamer, 'coinAddressChanged')
+                .withArgs(vars.addr2.address);
+
+            await expect(vars.streamer.changeAdmin(vars.addr3.address))
+                .to.emit(vars.streamer, 'adminChanged')
+                .withArgs(vars.addr3.address);
 
             // checking addresses
             expect(await vars.streamer.adrAlcV2()).to.equal(vars.addr1.address);
@@ -68,6 +76,7 @@ describe("streamer", function () {
         it("Drawing down", async function () {
             await vars.streamer.creatStream(1000,
                 vars.addr1.address,0, false, []);
+
             sleep(2000);
 
             await expect(vars.streamer.drainStreams(
@@ -75,7 +84,7 @@ describe("streamer", function () {
                 [vars.owner.address],
                 [2000]))
                 .to.emit(vars.streamer, 'streamDrain')
-                .withArgs(vars.addr1.address, 2000);
+                .withArgs([vars.owner.address]);
         });
     });
     describe("break stream time", async function () {

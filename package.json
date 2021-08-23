@@ -18,7 +18,10 @@
     "ethers": "^5.4.4",
     "hardhat": "^2.6.0",
     "hardhat-gas-reporter": "^1.0.4",
-    "hardhat-spdx-license-identifier": "^2.0.3",
     "solidity-coverage": "^0.7.16"
+  },
+  "dependencies": {
+    "@openzeppelin/test-helpers": "^0.5.13",
+    "hardhat-spdx-license-identifier": "^2.0.3"
   }
 }
