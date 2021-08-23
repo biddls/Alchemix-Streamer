@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: UNLICENSED
-
-
-
 pragma solidity ^0.8.0;
 
 import {IalcV2Vault} from "./interfaces/IalcV2Vault.sol";
@@ -11,6 +7,8 @@ contract streamer {
     // how much an address gets
     // fromAdr -> toAdr -> amount
     mapping(address => mapping(address => stream)) public gets;
+
+    IalcV2Vault public vault;
 
     struct stream{
         uint256 cps; // coins per second
@@ -39,9 +37,10 @@ contract streamer {
         admin = msg.sender;
     }
 
-    function changeAlcV2 (address _new) external {
+    function changeAlcV2 (address _new, address _vaultAddr) external {
         require(msg.sender == admin, "admin only");
         adrAlcV2 = _new;
+        vault = IalcV2Vault(_vaultAddr);
     }
 
     function setCoinAddress (address _coinAddress) external {
@@ -89,20 +88,36 @@ contract streamer {
     }
 
     // draw down from stream //temp adj for testing
-    function drainStreams(address _to, address[] memory _arrayOfStreamers, uint256[] memory _amounts) external {
+    function drainStreams(address _to,
+        address[] memory _arrayOfStreamers,
+        uint256[] memory _amounts) external {
+
         uint256 _amount;
+
         for(uint256 i=0; i < _arrayOfStreamers.length; i++){
             stream memory _temp = gets[_arrayOfStreamers[i]][_to];
+
+            // will combine all these (keep it simple to begin w)
             if((!_temp.openDrawDown && addressIndex[_temp.ID][msg.sender]) ||
-                _temp.openDrawDown){ // if (closed but your on the list your fine) or your open
+                _temp.openDrawDown){
+
                 if(block.timestamp >= _temp.freq + _temp.sinceLast){
                     _amount = (block.timestamp - _temp.sinceLast) * _temp.cps;
+
                     if(_amounts[i] <= _amount && _amounts[i] > 0){
                         _amount = _amounts[i];
                     }
-//                    IalcV2Vault(adrAlcV2).mintFrom(toFrom[_to][i], _amount, _to);
+
+//                    (bool success, bytes memory returnData) =
+//                    address(token).call(
+//                        abi.encodePacked(
+//                            vault.mintFrom.selector,
+//                            abi.encode(toFrom[_to][i], _amount, _to)));
+
+//                    if (success) {
                     gets[_arrayOfStreamers[i]][_to].sinceLast = block.timestamp;
                     emit streamDrain(_to, _amount);
+//                    }
                 }
             }
         }
