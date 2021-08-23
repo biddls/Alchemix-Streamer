@@ -1,6 +1,8 @@
 const { expect } = require("chai");
 const { testing } = require("../script/testing.js");
 
+const zero_address = "0x0000000000000000000000000000000000000000";
+
 
 function sleep(milliseconds) {
     const start = Date.now();
@@ -40,42 +42,94 @@ describe("streamer", function () {
             expect(await vars.streamer.adrAlcV2()).to.equal(vars.addr1.address);
             expect(await vars.streamer.coinAddress()).to.equal(vars.addr2.address);
             expect(await vars.streamer.admin()).to.equal(vars.addr3.address);
+
+            await expect(vars.streamer.connect(vars.addr2).changeAlcV2(vars.addr1.address))
+                .to.be.revertedWith("admin only");
+            await expect(vars.streamer.connect(vars.addr2).setCoinAddress(vars.addr2.address))
+                .to.be.revertedWith("admin only");
+            await expect(vars.streamer.connect(vars.addr2).changeAdmin(vars.addr3.address))
+                .to.be.revertedWith("admin only");
+
+            await expect(vars.streamer.connect(vars.addr3).changeAlcV2(zero_address))
+                .to.be.reverted;
+            await expect(vars.streamer.connect(vars.addr3).setCoinAddress(zero_address))
+                .to.be.reverted;
+            await expect(vars.streamer.connect(vars.addr3).changeAdmin(zero_address))
+                .to.be.reverted;
         });
     });
     describe("Stream", async function () {
         it("Create stream", async function () {
-            await vars.streamer.creatStream(1,
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(1,
                 vars.addr1.address, 0, false, [vars.owner.address]);
-            expect ((await vars.streamer.gets(
+            expect((await vars.streamer.gets(
                 vars.owner.address, vars.addr1.address))[0])
                 .to.equal(BigInt("1"));
             // cant get the time one to behave but it seems to be working fine
-            expect ((await vars.streamer.gets(
+            expect((await vars.streamer.gets(
                 vars.owner.address, vars.addr1.address))[2])
                 .to.equal(BigInt("0"));
-            expect ((await vars.streamer.gets(
+            expect((await vars.streamer.gets(
                 vars.owner.address, vars.addr1.address))[3])
                 .to.be.false;
-            expect ((await vars.streamer.gets(
+            expect((await vars.streamer.gets(
                 vars.owner.address, vars.addr1.address))[4])
                 .to.equal(0);
         });
+        it("test to make open stream", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await expect(vars.streamer.createStream(1,
+                vars.addr1.address, 0, true, [vars.owner.address])).to.be.reverted;
+
+            // v2 code here to get approval for the contract to draw down
+            await expect(vars.streamer.createStream(1,
+                vars.addr1.address, 0, true, []))
+                .to.emit(vars.streamer, 'streamStarted')
+                .withArgs(vars.owner.address, vars.addr1.address, 0);
+        });
+        it("dont stream to 0 address", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await expect(vars.streamer.createStream(1,
+                zero_address, 0, true, [])).to.be.reverted;
+        });
+        it("streams CPS > 0", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await expect(vars.streamer.createStream(0,
+                vars.addr1.address, 0, true, [])).to.be.reverted;
+        });
+    });
+    describe("closing stream", async function () {
         it("Close stream", async function () {
-            await vars.streamer.creatStream(1,
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(1,
                 vars.addr1.address, 0, false, [vars.owner.address]);
             await vars.streamer.closeStream(vars.addr1.address);
 
-            expect ((await vars.streamer.gets(
+            expect((await vars.streamer.gets(
                 vars.owner.address, vars.addr1.address))[0])
                 .to.equal(BigInt("0"));
             // cant get the time one to behave but it seems to be working fine
-            expect ((await vars.streamer.gets(
+            expect((await vars.streamer.gets(
                 vars.owner.address, vars.addr1.address))[2])
                 .to.equal(BigInt("0"));
         });
-        it("Drawing down", async function () {
-            await vars.streamer.creatStream(1000,
-                vars.addr1.address,0, false, []);
+        it("Close stream thats to the 0 addr", async function () {
+            await expect(vars.streamer.closeStream(zero_address)).to.be.reverted;
+        });
+        it("Close stream thats got 0 cpr (already closed)", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(1,
+                vars.addr1.address, 0, false, [vars.owner.address]);
+            await vars.streamer.closeStream(vars.addr1.address);
+            await expect(vars.streamer.closeStream(vars.addr1.address)).to.be.reverted;
+        });
+    });
+    describe("drawing down", async function () {
+        it("Normal drawing down", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(1000,
+                vars.addr1.address,0, true, []);
 
             sleep(2000);
 
@@ -84,28 +138,74 @@ describe("streamer", function () {
                 [vars.owner.address],
                 [2000]))
                 .to.emit(vars.streamer, 'streamDrain')
+                .withArgs([]);
+        });
+        it("draw down too soon", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(1000,
+                vars.addr1.address, 10, true, []);
+
+            await expect(vars.streamer.drainStreams(
+                vars.addr1.address,
+                [vars.owner.address],
+                [2000]))
+                .to.emit(vars.streamer, 'streamDrain')
                 .withArgs([vars.owner.address]);
+        });
+        it("draw down too much", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(1000,
+                vars.addr1.address,0, true, []);
+
+            sleep(2000);
+
+            await expect(vars.streamer.drainStreams(
+                vars.addr1.address,
+                [vars.owner.address],
+                [3000]))
+                .to.emit(vars.streamer, 'streamDrain')
+                .withArgs([]);
+        });
+        it("draw down from address you dont have approval for", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(1000,
+                vars.addr1.address,0, true, []);
+
+            sleep(2000);
+
+            await expect(vars.streamer.drainStreams(
+                vars.addr1.address,
+                [vars.owner.address],
+                [2000]))
+                .to.emit(vars.streamer, 'streamDrain')
+                .withArgs([]);
         });
     });
     describe("break stream time", async function () {
         it("die! stream i will break u", async function () {
             // owner to addr 1-3
-            await vars.streamer.creatStream(1, vars.addr1.address, 7,
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(1, vars.addr1.address, 7,
                 false, [vars.owner.address, vars.addr1.address]);
-            await vars.streamer.creatStream(2, vars.addr2.address, 8,
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(2, vars.addr2.address, 8,
                 false, [vars.owner.address, vars.addr2.address]);
-            await vars.streamer.creatStream(3, vars.addr3.address, 9,
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(3, vars.addr3.address, 9,
                 false, [vars.owner.address, vars.addr3.address]);
 
             // addr1 to owner and addr 2-3
+            // v2 code here to get approval for the contract to draw down
             await vars.streamer.connect(vars.addr1)
-                .creatStream(4, vars.owner.address, 10,
+                .createStream(4, vars.owner.address, 10,
                     false, [vars.owner.address, vars.addr1.address]);
+            // v2 code here to get approval for the contract to draw down
             await vars.streamer.connect(vars.addr1)
-                .creatStream(5, vars.addr2.address, 11,
+                .createStream(5, vars.addr2.address, 11,
                     false, [vars.owner.address, vars.addr2.address]);
+            // v2 code here to get approval for the contract to draw down
             await vars.streamer.connect(vars.addr1)
-                .creatStream(6, vars.addr3.address, 12,
+                .createStream(6, vars.addr3.address, 12,
                     false, [vars.owner.address, vars.addr3.address]);
 
             // making sure the streaming info is working
@@ -182,7 +282,8 @@ describe("streamer", function () {
     });
     describe ("Approvals management", async function () {
         it ("Revoke and grant approval", async function () {
-            await vars.streamer.creatStream(
+            // v2 code here to get approval for the contract to draw down
+            await vars.streamer.createStream(
                 1, vars.addr1.address, 0,
                 false, [vars.owner.address,
                     vars.addr1.address,

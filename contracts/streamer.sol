@@ -1,33 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pragma solidity ^0.8.0;
 
 import {IalcV2Vault} from "./interfaces/IalcV2Vault.sol";
@@ -69,6 +41,7 @@ contract streamer {
 
     function changeAlcV2 (address _new) external {
         require(msg.sender == admin, "admin only");
+        require(_new != address(0));
         adrAlcV2 = _new;
         vault = IalcV2Vault(_new);
         emit changedAlcV2(_new);
@@ -76,6 +49,7 @@ contract streamer {
 
     function setCoinAddress (address _new) external {
         require(msg.sender == admin, "admin only");
+        require(_new != address(0));
         coinAddress = _new;
         emit coinAddressChanged(_new);
     }
@@ -88,18 +62,13 @@ contract streamer {
     }
 
     // create stream
-    function creatStream(
+    function createStream(
         uint256 _cps, address _to, uint256 _freq, bool _openDrawDown, address[] memory _approvals
     ) external {
         if(_openDrawDown){require(_approvals.length == 0);}
         require(_to != address(0), "cannot stream to 0 address");
         require(_cps > 0, "should not stream 0 coins");
-        /*
-        // fromAdr -> ToAdr
-        fromTo[msg.sender].push(_to);
-        // ToAdr -> FromAdr
-        toFrom[_to].push(msg.sender);
-        */
+
         // gets
         gets[msg.sender][_to] = stream(_cps, block.timestamp, _freq, _openDrawDown, streams); // need to work on this
         for(uint256 i=0; i < _approvals.length; i++){
@@ -138,7 +107,7 @@ contract streamer {
                     _amount = (block.timestamp - _temp.sinceLast) * _temp.cps;
 
                     if(_amounts[i] <= _amount && _amounts[i] > 0){
-                        _amount = _amounts[i];
+                        _amount = _amounts[i]; //defaults to the max amount it can ask for if not enough
                     }
 
                     (bool success, bytes memory returnData) =
@@ -147,14 +116,14 @@ contract streamer {
                             vault.mintFrom.selector,
                             abi.encode(_arrayOfStreamers[i], _amount, _to)));
 
-                    if (success) {
+                    if (success) { //cant test V2 yet
                         gets[_arrayOfStreamers[i]][_to].sinceLast = block.timestamp;
                         _arrayOfStreamers[i] = address(0);
                     }
                 }
             }
         }
-        emit streamDrain(_arrayOfStreamers);
+        emit streamDrain(_arrayOfStreamers); // returns an array of all unsuccessful drains
     }
 
     function revokeApprovals(address _toAddr, address[] memory _addresses) external {

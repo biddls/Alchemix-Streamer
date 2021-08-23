@@ -25,10 +25,6 @@ module.exports = {
     cache: "./cache",
     artifacts: "./artifacts"
   },
-  spdxLicenseIdentifier: {
-    overwrite: true,
-    runOnCompile: true,
-  },
   gasReporter: {//comment me out to toggle
     enabled: process.env.REPORT_GAS
   }
