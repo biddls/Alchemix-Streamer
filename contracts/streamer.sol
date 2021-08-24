@@ -92,9 +92,7 @@ contract streamer {
     // draw down from stream //temp adj for testing
     function drainStreams(address _to, // address that receives
         address[] memory _arrayOfStreamers, // addresses that feed into _to
-        uint256[] memory _amounts) external { // the amount of coins they want to draw down from each address
-
-        uint256 _amount;
+        uint256[] memory _amounts) external returns (uint256 _amount) { // the amount of coins they want to draw down from each address
 
         for(uint256 i=0; i < _arrayOfStreamers.length; i++){
             stream memory _temp = gets[_arrayOfStreamers[i]][_to];
@@ -104,17 +102,19 @@ contract streamer {
                 _temp.openDrawDown){
 
                 if(block.timestamp >= _temp.freq + _temp.sinceLast){
-                    _amount = (block.timestamp - _temp.sinceLast) * _temp.cps;
+                    uint256 _temp = (block.timestamp - _temp.sinceLast) * _temp.cps;
 
-                    if(_amounts[i] <= _amount && _amounts[i] > 0){
-                        _amount = _amounts[i]; //defaults to the max amount it can ask for if not enough
+                    if(_amounts[i] <= _temp && _amounts[i] > 0){
+                        _temp = _amounts[i]; //defaults to the max amount it can ask for if not enough
                     }
+
+                    _amount += _amounts[i];
 
                     (bool success, bytes memory returnData) =
                     address(adrAlcV2).call(
                         abi.encodePacked(
                             vault.mintFrom.selector,
-                            abi.encode(_arrayOfStreamers[i], _amount, _to)));
+                            abi.encode(_arrayOfStreamers[i], _temp, _to)));
 
                     if (success) { //cant test V2 yet
                         gets[_arrayOfStreamers[i]][_to].sinceLast = block.timestamp;
@@ -124,6 +124,7 @@ contract streamer {
             }
         }
         emit streamDrain(_arrayOfStreamers); // returns an array of all unsuccessful drains
+        return _amount; // need to test
     }
 
     function revokeApprovals(address _toAddr, address[] memory _addresses) external {

@@ -36,10 +36,10 @@ interface Istreamer {
 
     // draw down from stream
     function drainStreams(
-        address _to,
-        address[] memory _arrayOfStreamers,
-        uint256[] memory _amounts
-    ) external;
+        address _to, // address that gets the coins
+        address[] memory _arrayOfStreamers, // from addresses
+        uint256[] memory _amounts // amount you want from each
+    ) external returns (uint256 _amount);
 
     // approval management
     function revokeApprovals( // TESTED

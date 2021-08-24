@@ -21,6 +21,7 @@
     "solidity-coverage": "^0.7.16"
   },
   "dependencies": {
+    "@openzeppelin/contracts": "^4.3.0",
     "@openzeppelin/test-helpers": "^0.5.13",
     "hardhat-spdx-license-identifier": "^2.0.3"
   }
