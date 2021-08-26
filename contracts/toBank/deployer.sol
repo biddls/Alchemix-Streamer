@@ -1,12 +1,14 @@
+// SPDX-License-Identifier: UNLICENSED
+
 pragma solidity ^0.8.0;
 
 import "./router.sol";
 
 contract deployer {
 
-    router public routerContract;
+    router internal _routerCont;
 
-    address public router;
+    address public routerAddr;
     address public alUSD;
     address public AMM;
     address public Tusd;
@@ -16,16 +18,16 @@ contract deployer {
         admin = msg.sender;
     }
 
-    function makeRouter(address _bankAddr){
-        require(_bankAddr != address(0), "can't route to 0 addr");
-        new router(router, alUSD, AMM, Tusd, _bankAddr);
+    function makeRouter (address _sendTusdTo) external{
+        require(_sendTusdTo != address(0), "can't route to 0 addr");
+        new router(routerAddr, alUSD, AMM, Tusd, _sendTusdTo);
     }
 
     // admin
-    function change_router(address _to) external {
+    function change_routerAddr(address _to) external {
         require(_to != address(0));
         require(msg.sender == admin);
-        router = _to;
+        routerAddr = _to;
     }
     function change_alUSD(address _to) external {
         require(_to != address(0));
@@ -41,11 +43,6 @@ contract deployer {
         require(_to != address(0));
         require(msg.sender == admin);
         Tusd = _to;
-    }
-    function change_sendTusdTo(address _to) external {
-        require(_to != address(0));
-        require(msg.sender == admin);
-        sendTusdTo = _to;
     }
     function change_admin(address _to) external {
         require(_to != address(0));

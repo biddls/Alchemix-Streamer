@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: UNLICENSED
+
 pragma solidity ^0.8.0;
 
 // import streamer
@@ -5,28 +7,29 @@ import ".././interfaces/Istreamer.sol";
 
 // import alusd interface
 // import Tusd interface
-import ".././node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // import AMM interface
 
 // import trust wallet interface
 
 
-contract router is IERC20, Istreamer{
+contract router{
 
-    address public router;
+    address public streamer;
     address public alUSD;
     address public AMM;
     address public Tusd;
     address public sendTusdTo;
 
-    constructor(address _router,
+    constructor(
+        address _streamer,
         address _alUSD,
         address _AMM,
         address _Tusd,
         address _sendTusdTo){
 
-        router = _router;
+        streamer = _streamer;
         alUSD = _alUSD;
         Tusd = _Tusd;
         AMM = _AMM;
@@ -37,29 +40,24 @@ contract router is IERC20, Istreamer{
     function route (
         address[] memory _arrayOfStreamers,
         uint256[] memory _amounts) external {
-        uint256[streamsFrom.length] memory _amounts;
 
-        (bool success, bytes memory returnDataAlAsset) =
-        address(router).call(
+        // drain streams
+        (bool success, bytes memory returnDataDrainStreams) =
+        address(streamer).call(
             abi.encodePacked(
-                Istreamer.mintFrom.selector,
+                Istreamer.drainStreams.selector,
                 abi.encode(address(this), _arrayOfStreamers, _amounts)));
 
         require(success, "Draw down failed");
 
         // do AMM swap now
 
-        // send to bank account
 
-        emit routed(returnDataAlAsset, returnDataAsset);
+        // send to bank account
+        IERC20(Tusd).transfer(sendTusdTo, IERC20(Tusd).balanceOf(address(this)));
     }
 
     event routeCreated(
         address contAddr
-    );
-
-    event routed(
-        bytes memory,
-        bytes memory
     );
 }

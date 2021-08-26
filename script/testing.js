@@ -5,6 +5,7 @@ const testing = async function() {
     const balance = await owner.getBalance();
 
     // testing stuff
+    // streamer
     let contract = await ethers.getContractFactory("streamer");
     const streamer = await contract.deploy();
 
@@ -12,14 +13,19 @@ const testing = async function() {
     // streamer.setCoinAddress(addr2.address);
     // streamer.changeAdmin(addr3.address);
 
+    // deployer
+    contract = await ethers.getContractFactory("deployer");
+    const deployer = await contract.deploy();
+
     return {
-        streamer: streamer,
-        balance: balance,
-        owner: owner,
-        addr1: addr1,
-        addr2: addr2,
-        addr3: addr3,
-        addrs: addrs
+        streamer,
+        deployer,
+        balance,
+        owner,
+        addr1,
+        addr2,
+        addr3,
+        addrs
     };
 }
 
