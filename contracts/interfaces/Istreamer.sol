@@ -4,51 +4,58 @@ pragma solidity ^0.8.0;
 
 interface Istreamer {
     // admin stuff
-    function changeAlcV2 ( // TESTED
+    function changeAlcV2 (
         address _new
     ) external;
 
-    function setCoinAddress ( // TESTED
-        address _coinAddress
+    function setCoinAddress (
+        address _new
     ) external;
 
-    function changeAdmin ( // TESTED
-        address _to
+    function changeAdmin (
+        address _new
     ) external;
 
     // data stuff
-    function adrAlcV2() external; // TESTED
-    function coinAddress() external; // TESTED
-    function admin() external; // TESTED
+    function adrAlcV2 (
+    ) external view returns (address);
+    function vault (
+    ) external view returns (address);
+    function coinAddress (
+    ) external view returns (address);
+    function admin (
+    ) external view returns (address);
 
     // streams
-    function creatStream( // TESTED
+    function createStream (
         uint256 _cps,
         address _to,
         uint256 _freq,
-        bool _openDrawDown,
-        address[] memory _approvals
+        uint256 _start,
+        bool _now
     ) external;
 
-    function closeStream( // TESTED
-        address _to
+    function closeStream (
+        uint256 _id
     ) external;
 
-    // draw down from stream
-    function drainStreams(
-        address _to, // address that gets the coins
-        address[] memory _arrayOfStreamers, // from addresses
-        uint256[] memory _amounts // amount you want from each
-    ) external returns (uint256 _amount);
-
-    // approval management
-    function revokeApprovals( // TESTED
-        address _fromAddr,
-        address[] memory _addresses
+    function drainStreams (
+        address[] memory _payers,
+        uint256[] memory _IDs,
+        uint256[] memory _amounts
     ) external;
 
-    function grantApprovals( // TESTED
-        address _toAddr,
-        address[] memory _addresses
-    ) external;
+    function gets (
+        address,
+        uint256
+    ) external view returns (
+        address payee,
+        uint256 cps,
+        uint256 sinceLast,
+        uint256 freq
+    );
+
+    function streams (
+        address
+    ) external view returns (uint256);
 }

@@ -23,6 +23,7 @@
   "dependencies": {
     "@openzeppelin/contracts": "^4.3.0",
     "@openzeppelin/test-helpers": "^0.5.13",
+    "hardhat-interface-generator": "0.0.6",
     "hardhat-spdx-license-identifier": "^2.0.3"
   }
 }

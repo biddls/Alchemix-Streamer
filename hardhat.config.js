@@ -2,6 +2,7 @@ require("@nomiclabs/hardhat-waffle");
 require('solidity-coverage')
 require("hardhat-gas-reporter");
 require('hardhat-spdx-license-identifier');
+require("hardhat-interface-generator");
 
 module.exports = {
   defaultNetwork: "hardhat",
