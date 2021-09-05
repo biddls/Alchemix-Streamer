@@ -32,7 +32,9 @@ interface Istreamer {
         address _to,
         uint256 _freq,
         uint256 _start,
-        bool _now
+        uint256 _end,
+        bool _now,
+        address[] memory _route
     ) external;
 
     function closeStream (

@@ -17,9 +17,40 @@ const testing = async function() {
     contract = await ethers.getContractFactory("deployer");
     const deployer = await contract.deploy();
 
+    //testing custom conts
+    contract = await ethers.getContractFactory("forward");
+    const forward = await contract.deploy();
+    contract = await ethers.getContractFactory("forwardBroken");
+    const forwardBroken = await contract.deploy();
+    contract = await ethers.getContractFactory("reverts");
+    const reverts = await contract.deploy();
+
+    // fake V2 contract
+    contract = await ethers.getContractFactory("V2");
+    const v2 = await contract.deploy();
+
+    // external minter contract
+    contract = await ethers.getContractFactory("ERC_20_EXTERNAL_MINTER");
+    const alAsset = await contract.attach(
+        await v2.alAsset()// The deployed contract address
+    );
+
+    // setting stuff up to plug into one another
+    // into V2
+    streamer.changeAlcV2(v2.address);
+
+    // into the alAsset
+    streamer.setCoinAddress(alAsset.address);
+    deployer.change_alAsset(alAsset.address);
+
     return {
         streamer,
         deployer,
+        forward,
+        forwardBroken,
+        reverts,
+        v2,
+        alAsset,
         balance,
         owner,
         addr1,
@@ -29,6 +60,25 @@ const testing = async function() {
     };
 }
 
+const testingGeneral = async function(decimals) {
+    let [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
+    const balance = await owner.getBalance();
+
+    // my stuff
+    let Token = await ethers.getContractFactory('ERC_20_EXTERNAL_MINTER');
+    const TEST = await Token.deploy(10000, decimals, "test", "TST");
+
+    await TEST.updateMinter(owner.address); // sets the external minter
+
+    return {balance: balance,
+        TEST: TEST,
+        owner: owner,
+        addr1: addr1,
+        addr2: addr2,
+        addrs: addrs};
+}
+
 module.exports = {
-    testing
+    testing,
+    testingGeneral
 }

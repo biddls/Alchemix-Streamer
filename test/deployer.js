@@ -31,11 +31,11 @@ describe("deployer", function () {
             expect (await vars.deployer.routerAddr()).to.equal(
                 vars.addr1.address);
         });
-        it("change_alUSD", async function () {
-            await vars.deployer.change_alUSD(
+        it("change_alAsset", async function () {
+            await vars.deployer.change_alAsset(
                 vars.addr1.address);
 
-            expect (await vars.deployer.alUSD()).to.equal(
+            expect (await vars.deployer.alAsset()).to.equal(
                 vars.addr1.address);
         });
         it("change_AMM", async function () {
@@ -58,6 +58,43 @@ describe("deployer", function () {
 
             expect (await vars.deployer.admin()).to.equal(
                 vars.addr1.address);
+        });
+    });
+    describe("else paths", async function () {
+        it("change_routerAddr", async function () {
+            await expect( vars.deployer.change_routerAddr(
+                zero_address)).to.be.reverted;
+
+            await expect( vars.deployer.connect(vars.addr2).change_routerAddr(
+                vars.addr1.address)).to.be.reverted;
+        });
+        it("change_alAsset", async function () {
+            await expect( vars.deployer.change_alAsset(
+                zero_address)).to.be.reverted;
+
+            await expect( vars.deployer.connect(vars.addr2).change_alAsset(
+                vars.addr1.address)).to.be.reverted;
+        });
+        it("change_AMM", async function () {
+            await expect( vars.deployer.change_AMM(
+                zero_address)).to.be.reverted;
+
+            await expect( vars.deployer.connect(vars.addr2).change_AMM(
+                vars.addr1.address)).to.be.reverted;
+        });
+        it("change_Tusd", async function () {
+            await expect( vars.deployer.change_Tusd(
+                zero_address)).to.be.reverted;
+
+            await expect( vars.deployer.connect(vars.addr2).change_Tusd(
+                vars.addr1.address)).to.be.reverted;
+        });
+        it("change_admin", async function () {
+            await expect( vars.deployer.change_admin(
+                zero_address)).to.be.reverted;
+
+            await expect( vars.deployer.connect(vars.addr2).change_admin(
+                vars.addr1.address)).to.be.reverted;
         });
     })
 });

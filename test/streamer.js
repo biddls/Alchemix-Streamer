@@ -62,7 +62,7 @@ describe("streamer", function () {
         it("Create stream", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamer.createStream(
-                1, vars.addr1.address, 0, 0, true);
+                1, vars.addr1.address, 0, 0, 0, true, []);
             expect((await vars.streamer.gets(
                 vars.owner.address, 0))[0])
                 .to.equal(vars.addr1.address);
@@ -78,27 +78,27 @@ describe("streamer", function () {
         it("test to make open stream", async function () {
             // v2 code here to get approval for the contract to draw down
             await expect(vars.streamer.createStream(
-                1, vars.addr1.address, 0, 0, true)
+                1, vars.addr1.address, 0, 0,0, true, [])
             ).to.emit(vars.streamer, 'streamStarted')
                 .withArgs(vars.owner.address, 0);
         });
         it("dont stream to 0 address", async function () {
             // v2 code here to get approval for the contract to draw down
             await expect(vars.streamer.createStream(
-                1, zero_address, 0, 0, true)).to.be.revertedWith("cannot stream to 0 address");
+                1, zero_address, 0, 0, 0, true, [])).to.be.revertedWith("cannot stream to 0 address");
         });
         it("streams CPS > 0", async function () {
             // v2 code here to get approval for the contract to draw down
             await expect(vars.streamer.createStream(
-                0, vars.addr1.address, 0, 0, true,)).to.be.revertedWith("should not stream 0 coins");
+                0, vars.addr1.address, 0, 0, 0, true, [])).to.be.revertedWith("should not stream 0 coins");
         });
     });
     describe("closing stream", async function () {
         it("Close stream", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamer.createStream(
-                1, vars.addr1.address, 0, 0, true);
-            await vars.streamer.closeStream(0);
+                1, vars.addr1.address, 0, 0, 0, true, []);
+            await vars.v2.setLimit(100);
 
             expect((await vars.streamer.gets(
                 vars.owner.address, vars.addr1.address))[1])
@@ -113,7 +113,9 @@ describe("streamer", function () {
         it("Normal drawing down", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamer.createStream(
-                1000, vars.addr1.address,0, 0, true);
+                1000, vars.addr1.address,0, 0, 0, true, []);
+
+            await vars.v2.setLimit(100);
 
             vars.streamer.drainStreams([vars.owner.address],
                 [0],
@@ -122,7 +124,9 @@ describe("streamer", function () {
         it("draw down too soon", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamer.createStream(
-                1000, vars.addr1.address, 10, 0, true);
+                1000, vars.addr1.address, 10, 0, 0, true, []);
+
+            await vars.v2.setLimit(100);
 
             await vars.streamer.drainStreams(
                 [vars.owner.address],
@@ -132,27 +136,90 @@ describe("streamer", function () {
         it("draw down too much", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamer.createStream(
-                1, vars.addr1.address, 0, 0, true);
+                1, vars.addr1.address, 0, 0, 0, true, []);
+
+            await vars.v2.setLimit(100);
 
             await vars.streamer.drainStreams(
                 [vars.owner.address],
                 [0],
                 [2000]);
         });
-        it("darrays arnt the same length", async function () {
+        it("arrays arnt the same length", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamer.createStream(
-                1, vars.addr1.address, 0, 0, true);
+                1, vars.addr1.address, 0, 0, 0, true, []);
+
+            await vars.v2.setLimit(100);
 
             await expect(vars.streamer.drainStreams(
                 [vars.owner.address],
                 [0, 1],
-                [2000])).to.be.revertedWith("all the arrays must be the same length");
+                [2000])).to.be.revertedWith("_IDs array wrong length");
 
             await expect(vars.streamer.drainStreams(
                 [vars.owner.address],
                 [0],
-                [2000, 2])).to.be.revertedWith("all the arrays must be the same length");
+                [2000, 2])).to.be.revertedWith("_amounts array wrong length");
+        });
+    });
+    describe("custom contract interactions", async function () {
+        it("basic forwarding contract", async function () {
+            await vars.streamer.createStream(
+                1, vars.addr1.address, 0, 0, 0, true, [vars.forward.address]);
+
+            await vars.v2.setLimit(100);
+
+            await vars.streamer.drainStreams(
+                [vars.owner.address],
+                [0],
+                [1]);
+        });
+        it("basic broken forwarding contract", async function () {
+            await vars.streamer.createStream(
+                1, vars.addr1.address, 0, 0, 0, true, [vars.forwardBroken.address]);
+
+            await vars.v2.setLimit(100);
+
+            await vars.streamer.drainStreams(
+                [vars.owner.address],
+                [0],
+                [1]);
+        });
+        it("all this one does is revert", async function () {
+            await vars.streamer.createStream(
+                1, vars.addr1.address, 0, 0, 0, true, [vars.reverts.address]);
+
+            await vars.v2.setLimit(100);
+
+            await vars.streamer.drainStreams(
+                [vars.owner.address],
+                [0],
+                [1]);
+        })
+    });
+    describe("V2", async function () {
+        it("got enough funds",async function () {
+            await vars.streamer.createStream(
+                1, vars.addr1.address, 0, 0, 0, true, []);
+
+            await vars.v2.setLimit(100);
+
+            await vars.streamer.drainStreams(
+                [vars.owner.address],
+                [0],
+                [1]);
+        });
+        it("not enough funds", async function () {
+            await vars.streamer.createStream(
+                1, vars.addr1.address, 0, 0, 0, true, []);
+
+            await vars.v2.setLimit(0);
+
+            await vars.streamer.drainStreams(
+                [vars.owner.address],
+                [0],
+                [1000]);
         });
     });
 });

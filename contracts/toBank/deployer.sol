@@ -9,7 +9,7 @@ contract deployer {
     router internal _routerCont;
 
     address public routerAddr;
-    address public alUSD;
+    address public alAsset;
     address public AMM;
     address public Tusd;
     address public admin;
@@ -20,7 +20,7 @@ contract deployer {
 
     function makeRouter (address _sendTusdTo) external{
         require(_sendTusdTo != address(0), "can't route to 0 addr");
-        new router(routerAddr, alUSD, AMM, Tusd, _sendTusdTo);
+        new router(routerAddr, alAsset, AMM, Tusd, _sendTusdTo);
     }
 
     // admin
@@ -29,10 +29,10 @@ contract deployer {
         require(msg.sender == admin);
         routerAddr = _to;
     }
-    function change_alUSD(address _to) external {
+    function change_alAsset(address _to) external {
         require(_to != address(0));
         require(msg.sender == admin);
-        alUSD = _to;
+        alAsset = _to;
     }
     function change_AMM(address _to) external {
         require(_to != address(0));
