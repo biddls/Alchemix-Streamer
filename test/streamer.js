@@ -98,7 +98,7 @@ describe("streamer", function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamer.createStream(
                 1, vars.addr1.address, 0, 0, 0, true, []);
-            await vars.v2.setLimit(100);
+            // await vars.v2.setLimit(100);
 
             expect((await vars.streamer.gets(
                 vars.owner.address, vars.addr1.address))[1])
@@ -107,6 +107,9 @@ describe("streamer", function () {
             expect((await vars.streamer.gets(
                 vars.owner.address, vars.addr1.address))[1])
                 .to.equal(BigInt("0"));
+
+            await expect(vars.streamer.closeStream(1))
+                .to.emit(vars.streamer, 'streamClosed');
         });
     });
     describe("drawing down", async function () {

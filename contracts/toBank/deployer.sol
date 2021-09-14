@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-
+// i can just use the custom contract routing features instead
 pragma solidity ^0.8.0;
 
 import "./router.sol";

@@ -2,88 +2,82 @@
 
 pragma solidity ^0.8.0;
 
+import {Istreamer} from "./interfaces/Istreamer.sol";
+
+// this contract allows for external users to keep track of who is going next
+// its way more gas costly but if its on an L2 then people dont care as much
+// and allows keepers to be way lazier when calling the code
+// each address can deploy their own streaming contract
+
 contract lazyStreamer {
 
-    // each payer gets a queue for each day
-    mapping(address => DayQueue) public payerQueueLookup;
-    // pointers
-    uint256 first = 0;
-    uint256 last = 0;
+    address public streamerAddr;
+//    address public admin;
 
-    // each day holds a queue of IDs that can be run through
-    struct DayQueue{
-        // list of queues representing a list of IDs to be drawn down from
-        mapping(uint256 => Queue) dayQueue;
-        uint256 first;
-        uint256 last;
-    }
+    mapping(uint256 => Queue) dayQueue;
+    uint256 firstDay;
+    uint256 lastDay;
 
     // holds a queue of IDs
     struct Queue{
         // list of IDs to be drawn down on that day
         mapping(uint256 => uint256) IDs;
-        // makes sure that an ID cant be added twice
-        mapping(uint256 => bool) duplicateChecker;
-        // list of amounts to be drawn down with the corresponding ID on that day
-        mapping(uint256 => uint256) amounts;
         // pointers
         uint256 first;
         uint256 last;
     }
 
-    function pushStreams(address _payer, uint256 _dayNo, uint256[] memory _ids, uint256[] memory _amounts) external {
-        // makes sure your not adding data to a day in thepast
-        require(_dayNo >= payerQueueLookup[_payer].first);
-        _addStreams(_payer, _dayNo, _ids, _amounts);
-    }
-
-    function _pushStreams(address _payer, uint256 _dayNo, uint256[] memory _ids, uint256[] memory _amounts) internal {
-        // adjusts the pointers to make sure the data is kept track of
-        payerQueueLookup[_payer].last = _dayNo > payerQueueLookup[_payer].last? _dayNo : payerQueueLookup[_payer].last;
-        // makes sure that the data is the same length as each stream ID has to have an expected draw down amount
-        require(_ids.length == _amounts.length);
-        for(uint256 i;i<_ids.length;i++){
-            // add something here to check the data against the streaming contract to make sure the streams exist
-            // checks for duplicates
-            if(payerQueueLookup[_payer].dayQueue[_dayNo].duplicateChecker[_ids[i]]){
-                // if so its skipped
-                continue;
-            }
-            // adds stream to the data
-            // looks up the payer address // finds the day // finds the next point in the queue // adds data
-            payerQueueLookup[_payer].dayQueue[_dayNo].IDs[payerQueueLookup[_payer].dayQueue[_dayNo].last] = _ids[i];
-            payerQueueLookup[_payer].dayQueue[_dayNo].amounts[payerQueueLookup[_payer].dayQueue[_dayNo].last] = _amounts[i];
-            // increments the pointer
-            payerQueueLookup[_payer].dayQueue[_dayNo].last++;
+    function pushStreams(address _payer, uint256 _dayNo, uint256[] memory _ids) external {
+//        require(_payer == admin);
+        require(_dayNo >= firstDay);
+        for(uint256 i; i<_ids.length; i++){
+            // gets the queue for the day // gets the next spot on the queue then fills that spot int
+            dayQueue[_dayNo].IDs[dayQueue[_dayNo].last] = _ids[i];
+            // gets the same queue as above and increments the pointer to the next position
+            dayQueue[_dayNo].IDs[dayQueue[_dayNo].last]++;
         }
     }
 
-    function _pop(address _payer) internal returns (uint256 ID, uint256 amount) {
-        // gets the Queue struct number for the stream
-        Queue temp = payerQueueLookup[_payer].dayQueue[payerQueueLookup[_payer].first];
-        ID = temp.IDs[temp.first];
-        amount = temp.amounts[temp.first];
-        // makes sure that the mapping isnt empty
-        if(
-            payerQueueLookup[_payer].dayQueue[payerQueueLookup[_payer].first].last
-            >=
-            payerQueueLookup[_payer].dayQueue[payerQueueLookup[_payer].first].first){  // non-empty queue
-
-            // empty out the struct
-            delete payerQueueLookup[_payer].dayQueue[payerQueueLookup[_payer].first].IDs[temp.first];
-            delete payerQueueLookup[_payer].dayQueue[payerQueueLookup[_payer].first].duplicateChecker[temp.first];
-            delete payerQueueLookup[_payer].dayQueue[payerQueueLookup[_payer].first].amounts[temp.first];
-            payerQueueLookup[_payer].dayQueue[payerQueueLookup[_payer].first].first++;
-        } else { // if the mapping is empty
-            delete payerQueueLookup[_payer].dayQueue[payerQueueLookup[_payer].first].first;
-            // if there is no more left in the day move onto checking the day array
-            // fuck i confused ma self
-            if(payerQueueLookup[_payer].last
-                >=
-                payerQueueLookup[_payer].first){
-                // starts a recursion
-                return (_pop(_payer));
+    function pop() internal returns (uint256 ID) {
+//        require(_payer == admin);
+        // if the next day is empty try the next day
+        if(dayQueue[firstDay].first == dayQueue[firstDay].last) {
+            // make sure that there is a day
+            require(firstDay < lastDay);
+            //clear data
+            delete dayQueue[firstDay];
+            // tells it to move onto the next day
+            firstDay++;
+            // calls the same function again searching for the next day to use
+            return pop();
+        } else { // if there is a day
+            // gets the indexes for the queue of that day
+            uint256 _first = dayQueue[firstDay].first;
+            uint256 _last = dayQueue[firstDay].last;
+            // if there is data in the day
+            if(_first < _last){
+                // update pointers
+                dayQueue[firstDay].first++;
+                // gets the ID number
+                uint256 _id = dayQueue[firstDay].IDs[_first];
+                // clear data
+                delete dayQueue[firstDay].IDs[_first];
+                return _id;
+            } else {
+                // there is no data left in that day number
+                if(firstDay < lastDay){
+                    // deletes the day
+                    delete dayQueue[firstDay];
+                    // updates pointer
+                    firstDay++;
+                    // calls function again to try again
+                    pop();
+                } else {
+                    // there are no more streams to draw down from so that's the end of it
+                    revert();
+                }
             }
         }
+        return 1;
     }
 }
