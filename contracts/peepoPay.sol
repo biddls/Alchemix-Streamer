@@ -18,7 +18,8 @@ import {IcustomRouter} from "./interfaces/IcustomRouter.sol";
 // view function that finds who can be drawn down
 // lazy update system
 
-contract streamer {
+// the lower feature version that requires more upkeep and complexity
+contract peepoPay {
     // from => ID => stream
     // view function to return the IDs of all steams
     // swap into any erc-20 as well

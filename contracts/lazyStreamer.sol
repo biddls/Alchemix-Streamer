@@ -28,7 +28,6 @@ contract lazyStreamer {
     }
 
     function pushStreams(address _payer, uint256 _dayNo, uint256[] memory _ids) external {
-//        require(_payer == admin);
         require(_dayNo >= firstDay);
         for(uint256 i; i<_ids.length; i++){
             // gets the queue for the day // gets the next spot on the queue then fills that spot int
@@ -39,7 +38,6 @@ contract lazyStreamer {
     }
 
     function pop() internal returns (uint256 ID) {
-//        require(_payer == admin);
         // if the next day is empty try the next day
         if(dayQueue[firstDay].first == dayQueue[firstDay].last) {
             // make sure that there is a day

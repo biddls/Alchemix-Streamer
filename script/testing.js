@@ -6,8 +6,8 @@ const testing = async function() {
 
     // testing stuff
     // streamer
-    let contract = await ethers.getContractFactory("streamer");
-    const streamer = await contract.deploy();
+    let contract = await ethers.getContractFactory("peepoPay");
+    const peepoPay = await contract.deploy();
 
     // streamer.changeAlcV2(addr1.address);
     // streamer.setCoinAddress(addr2.address);
@@ -37,14 +37,14 @@ const testing = async function() {
 
     // setting stuff up to plug into one another
     // into V2
-    streamer.changeAlcV2(v2.address);
+    peepoPay.changeAlcV2(v2.address);
 
     // into the alAsset
-    streamer.setCoinAddress(alAsset.address);
+    peepoPay.setCoinAddress(alAsset.address);
     deployer.change_alAsset(alAsset.address);
 
     return {
-        streamer,
+        peepoPay,
         deployer,
         forward,
         forwardBroken,
