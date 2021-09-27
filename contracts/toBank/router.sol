@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 // import streamer
-import ".././interfaces/Istreamer.sol";
+import ".././interfaces/IpeepoPay.sol";
 
 // import alusd interface
 // import Tusd interface

@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-interface Istreamer {
+interface IpeepoPay {
     // admin stuff
     function changeAlcV2 (
         address _new
@@ -45,6 +45,12 @@ interface Istreamer {
         address[] memory _payers,
         uint256[] memory _IDs,
         uint256[] memory _amounts
+    ) external;
+
+    function drainStream (
+        address _payer,
+        uint256 _ID,
+        uint256 _amount
     ) external;
 
     function gets (
