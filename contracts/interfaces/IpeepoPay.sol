@@ -49,8 +49,7 @@ interface IpeepoPay {
 
     function drainStream (
         address _payer,
-        uint256 _ID,
-        uint256 _amount
+        uint256 _ID
     ) external;
 
     function gets (

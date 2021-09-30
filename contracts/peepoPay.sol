@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {IalcV2Vault} from "./interfaces/IalcV2Vault.sol";
-import {Istreamer} from "./interfaces/IpeepoPay.sol";
+import {IpeepoPay} from "./interfaces/IpeepoPay.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IcustomRouter} from "./interfaces/IcustomRouter.sol";
 
@@ -262,15 +262,12 @@ contract peepoPay {
     */
     function drainStreams(
         address[] memory _payers, // address that gives
-        uint256[] memory _IDs, // addresses that feed into _to
-        uint256[] memory _amounts // the amount of coins they want to draw down from each address
+        uint256[] memory _IDs // addresses that feed into _to
     ) external {
         // gets a var for how many streams are being interacted with
         uint256 length = _payers.length;
         // makes sure all the arrays are the same side (uses the transitive law)
         require(length == _IDs.length, "_IDs array wrong length");
-        require(length == _amounts.length, "_amounts array wrong length");
-
         // for loop to go through them all
 
         // IDFK
@@ -289,69 +286,7 @@ contract peepoPay {
                 _amount = (_stream.freq + _stream.sinceLast) <= _stream.end ?
                 (_stream.end - _stream.sinceLast) * _stream.cps : 0;
             }
-
-            // custom cont stuff here
-            bool success;
-            bytes memory returnData;
-            if(_stream.route.length == 0){
-                // if it is not a custom contract
-                // calls the borrow function in V2
-                (success, returnData) = _amount > 0 ? address(adrAlcV2).call( // if they are goin to get more than 0 coins
-                // then they are okay if they will get 0 coins then dont call the function
-                    abi.encodePacked(
-                        IalcV2Vault.mintFrom.selector,
-                        abi.encode(
-                            _payers[i],
-                            _amount, _stream.payee
-                        )
-                    )
-                ) : (false, bytes("0x")); // this bit here says that if your calling it to soon then you auto fail
-                // if its successful then update the streams data
-                if (success) { //cant test V2 yet
-                    gets[_payers[i]][_IDs[i]].sinceLast += block.timestamp;
-                    // needs work idk how people want this to behave
-                }
-            } else {
-                // if it is a custom contract
-                /*
-                this allows for people to route funds though custom contracts
-                like if you want to swap it to something or deposit into another protocol or anything
-                */
-                // calls the borrow function in V2
-                (success, returnData) = _amount > 0 ? address(adrAlcV2).call( // if they are goin to get more than 0 coins
-                // then they are okay if they will get 0 coins then dont call the function
-                    abi.encodePacked(
-                        IalcV2Vault.mintFrom.selector,
-                        abi.encode(
-                            _payers[i],
-                            _amount, _stream.route[0] //send it to this contract so it can then pass it on to the customCont
-                        )
-                    )
-                ) : (false, bytes("0x")); // this bit here says that if your calling it to soon then you auto fail
-                if(success && _stream.route.length > 0){
-
-                    (success, returnData) = _amount > 0 ? address(_stream.route[0]).call( // if they are goin to get more than 0 coins
-                    // then they are okay if they will get 0 coins then dont call the function
-                        abi.encodePacked(
-                            IcustomRouter.route.selector,
-                            abi.encode(
-                                coinAddress,
-                                _stream.payee,
-                                _amount, //calls the custom contract to then start the process
-                                _stream.route,
-                                1
-                            )
-                        )
-                    ) : (false, bytes("0x")); // this bit here says that if your calling it to soon then you auto fail
-                    if(success){
-                        uint256 _balance = IERC20(coinAddress).balanceOf(_stream.route[0]);
-
-                        if(_balance == 0){
-                            gets[_payers[i]][_IDs[i]].sinceLast = block.timestamp;
-                        }
-                    }
-                }
-            }
+            bool success = customContRouter(_stream, _payers[i], _IDs[i], _amount);
             // IDFK
 //            if(!success){
 //                failed.push(_payers[i]);
@@ -365,8 +300,7 @@ contract peepoPay {
     // not tested
     function drainStream (
         address _payer, // address that gives
-        uint256 _ID, // is of the stream
-        uint256 _amount // the amount of coins they want to draw down
+        uint256 _ID // is of the stream
     ) external {
         stream memory _stream = gets[_payer][_ID];
         // if the end of the stream is in the future or 0 (no end) then its okay
@@ -379,9 +313,23 @@ contract peepoPay {
             _amount = (_stream.freq + _stream.sinceLast) <= _stream.end ?
             (_stream.end - _stream.sinceLast) * _stream.cps : 0;
         }
+        bool success = customContRouter(_stream, _payer, _ID, _amount);
+        // IDFK
+/*            if(!success){
+                failed.push(_payers[i]);
+                ids.push(_IDs[i]);
+            }
 
-        // custom cont stuff here
-        bool success;
+        emit failedDrawDowns(failed, ids);
+*/
+    }
+
+    function customContRouter (
+        stream memory _stream,
+        address _payer,
+        uint256 _ID,
+        uint256 _amount
+    ) internal returns (bool success){
         bytes memory returnData;
         if(_stream.route.length == 0){
             // if it is not a custom contract
@@ -391,14 +339,14 @@ contract peepoPay {
                 abi.encodePacked(
                     IalcV2Vault.mintFrom.selector,
                     abi.encode(
-                        _payers[i],
+                        _payer,
                         _amount, _stream.payee
                     )
                 )
             ) : (false, bytes("0x")); // this bit here says that if your calling it to soon then you auto fail
             // if its successful then update the streams data
             if (success) { //cant test V2 yet
-                gets[_payers[i]][_IDs[i]].sinceLast += block.timestamp;
+                gets[_payer][_ID].sinceLast += block.timestamp;
                 // needs work idk how people want this to behave
             }
         } else {
@@ -413,7 +361,7 @@ contract peepoPay {
                 abi.encodePacked(
                     IalcV2Vault.mintFrom.selector,
                     abi.encode(
-                        _payers[i],
+                        _payer,
                         _amount, _stream.route[0] //send it to this contract so it can then pass it on to the customCont
                     )
                 )
@@ -437,18 +385,12 @@ contract peepoPay {
                     uint256 _balance = IERC20(coinAddress).balanceOf(_stream.route[0]);
 
                     if(_balance == 0){
-                        gets[_payers[i]][_IDs[i]].sinceLast = block.timestamp;
+                        gets[_payer][_ID].sinceLast = block.timestamp;
                     }
                 }
             }
         }
-        // IDFK
-//            if(!success){
-//                failed.push(_payers[i]);
-//                ids.push(_IDs[i]);
-//            }
-
-//        emit failedDrawDowns(failed, ids);
+        return success;
     }
 
     event streamStarted (

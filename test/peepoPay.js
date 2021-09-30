@@ -9,7 +9,7 @@ function sleep(milliseconds) {
     while (Date.now() - start < milliseconds);
 }
 
-describe("streamer", function () {
+describe("peepoPay", function () {
 
     let vars;
 
@@ -121,8 +121,7 @@ describe("streamer", function () {
             await vars.v2.setLimit(100);
 
             vars.peepoPay.drainStreams([vars.owner.address],
-                [0],
-                [1]);
+                [0]);
         });
         it("draw down too soon", async function () {
             // v2 code here to get approval for the contract to draw down
@@ -133,8 +132,18 @@ describe("streamer", function () {
 
             await vars.peepoPay.drainStreams(
                 [vars.owner.address],
-                [0],
-                [2000]);
+                [0]);
+        });
+        it("draw down too soon", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await vars.peepoPay.createStream(
+                1000, vars.addr1.address, 10, 0, 1, true, []);
+
+            await vars.v2.setLimit(100);
+
+            await vars.peepoPay.drainStreams(
+                [vars.owner.address],
+                [0]);
         });
         it("draw down too much", async function () {
             // v2 code here to get approval for the contract to draw down
@@ -145,8 +154,7 @@ describe("streamer", function () {
 
             await vars.peepoPay.drainStreams(
                 [vars.owner.address],
-                [0],
-                [2000]);
+                [0]);
         });
         it("arrays arnt the same length", async function () {
             // v2 code here to get approval for the contract to draw down
@@ -157,13 +165,30 @@ describe("streamer", function () {
 
             await expect(vars.peepoPay.drainStreams(
                 [vars.owner.address],
-                [0, 1],
-                [2000])).to.be.revertedWith("_IDs array wrong length");
+                [0, 1])).to.be.revertedWith("_IDs array wrong length");
+        });
+    });
+    describe("drawing down single", async function () {
+        it("Normal drawing down", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await vars.peepoPay.createStream(
+                1000, vars.addr1.address,0, 0, 0, true, []);
 
-            await expect(vars.peepoPay.drainStreams(
-                [vars.owner.address],
-                [0],
-                [2000, 2])).to.be.revertedWith("_amounts array wrong length");
+            await vars.v2.setLimit(100);
+
+            vars.peepoPay.drainStream(vars.owner.address,
+                0);
+        });
+        it("draw down too soon", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await vars.peepoPay.createStream(
+                1000, vars.addr1.address, 10, 0, 1, true, []);
+
+            await vars.v2.setLimit(100);
+
+            await vars.peepoPay.drainStream(
+                vars.owner.address,
+                0);
         });
     });
     describe("custom contract interactions", async function () {
@@ -175,8 +200,7 @@ describe("streamer", function () {
 
             await vars.peepoPay.drainStreams(
                 [vars.owner.address],
-                [0],
-                [1]);
+                [0]);
         });
         it("basic broken forwarding contract", async function () {
             await vars.peepoPay.createStream(
@@ -186,8 +210,7 @@ describe("streamer", function () {
 
             await vars.peepoPay.drainStreams(
                 [vars.owner.address],
-                [0],
-                [1]);
+                [0]);
         });
         it("all this one does is revert", async function () {
             await vars.peepoPay.createStream(
@@ -197,9 +220,18 @@ describe("streamer", function () {
 
             await vars.peepoPay.drainStreams(
                 [vars.owner.address],
-                [0],
-                [1]);
-        })
+                [0]);
+        });
+        it("no route", async function () {
+            await vars.peepoPay.createStream(
+                1, vars.addr1.address, 0, 0, 0, true, []);
+
+            await vars.v2.setLimit(100);
+
+            await vars.peepoPay.drainStreams(
+                [vars.owner.address],
+                [0]);
+        });
     });
     describe("V2", async function () {
         it("got enough funds",async function () {
@@ -210,8 +242,7 @@ describe("streamer", function () {
 
             await vars.peepoPay.drainStreams(
                 [vars.owner.address],
-                [0],
-                [1]);
+                [0]);
         });
         it("not enough funds", async function () {
             await vars.peepoPay.createStream(
@@ -221,8 +252,7 @@ describe("streamer", function () {
 
             await vars.peepoPay.drainStreams(
                 [vars.owner.address],
-                [0],
-                [1000]);
+                [0]);
         });
     });
 });

@@ -48,7 +48,7 @@ contract lazyStreamer {
         }
     }
 
-    function pushStream(uint256 _dayNo, uint256 _id) public {
+    function pushStream(uint256 _dayNo, uint256 _id) external {
         require(msg.sender == admin);
         require(_dayNo >= firstDay);
         _pushStream(_dayNo, _id);

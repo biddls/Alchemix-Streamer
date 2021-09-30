@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 // import streamer
-import ".././interfaces/IpeepoPay.sol";
+import {IpeepoPay} from ".././interfaces/IpeepoPay.sol";
 
 // import alusd interface
 // import Tusd interface
@@ -45,7 +45,7 @@ contract router{
         (bool success, bytes memory returnDataDrainStreams) =
         address(streamer).call(
             abi.encodePacked(
-                Istreamer.drainStreams.selector,
+                IpeepoPay.drainStreams.selector,
                 abi.encode(address(this), _arrayOfStreamers, _amounts)));
 
         require(success, "Draw down failed");

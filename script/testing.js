@@ -35,6 +35,10 @@ const testing = async function() {
         await v2.alAsset()// The deployed contract address
     );
 
+    // streamPay
+    contract = await ethers.getContractFactory("streamPay");
+    const streamPay = await contract.deploy(peepoPay.address);
+
     // setting stuff up to plug into one another
     // into V2
     peepoPay.changeAlcV2(v2.address);
@@ -45,6 +49,7 @@ const testing = async function() {
 
     return {
         peepoPay,
+        streamPay,
         deployer,
         forward,
         forwardBroken,
