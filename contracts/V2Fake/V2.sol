@@ -28,7 +28,7 @@ contract V2 {
         uint256 amount,
         address recipient
     ) external {
-        require(allowance[cdpOwner] >= amount);
+        require(allowance[cdpOwner] >= amount, "allowance not large enough");
         alAsset.externalMint(amount, recipient);
         allowance[cdpOwner] -= amount;
     }

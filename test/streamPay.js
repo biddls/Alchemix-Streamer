@@ -27,46 +27,46 @@ describe("streamPay", function () {
             await vars.streamPay.accountCreation();
 
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, 0, 0, true, []);
+                1, vars.addr1.address, 0, 0, 0, []);
 
             await vars.streamPay.populate(1, [0]);
         });
-        it("lazy draw down", async function () {
+/*        it("lazy draw down", async function () {
             await vars.streamPay.accountCreation();
 
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, 0, 0, true, []);
+                1, vars.addr1.address, 0, 0, 0, []);
 
             await vars.streamPay.populate(0, [0]);
 
-            await vars.streamPay.lazyDrawdown(vars.owner.address);
+            await vars.streamPay.lazyDrawdown(vars.owner.address, 0);
         });
         it("lazy draw down recursive", async function () {
             await vars.streamPay.accountCreation();
 
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, 0, 0, true, []);
+                1, vars.addr1.address, 0, 0, 0, []);
 
             await vars.streamPay.populate(1, [0]);
 
-            await vars.streamPay.lazyDrawdown(vars.owner.address);
+            await vars.streamPay.lazyDrawdown(vars.owner.address, 0);
         });
         it("lazy draw down to empy day", async function () {
             await vars.streamPay.accountCreation();
 
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, 0, 0, true, []);
+                1, vars.addr1.address, 0, 0, 0, []);
 
             await vars.streamPay.populate(1, [0]);
 
-            await vars.streamPay.lazyDrawdown(vars.owner.address);
-            await vars.streamPay.lazyDrawdown(vars.owner.address);
-        });
+            await vars.streamPay.lazyDrawdown(vars.owner.address, 0);
+            await vars.streamPay.lazyDrawdown(vars.owner.address, 0);
+        });*/
         it("lazy draw down remove day", async function () {
             await vars.streamPay.accountCreation();
 
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, 0, 0, true, []);
+                1, vars.addr1.address, 0, 0, 0, []);
 
             await vars.streamPay.populate(1, [0]);
 

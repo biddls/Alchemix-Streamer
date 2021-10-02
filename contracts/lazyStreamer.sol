@@ -7,7 +7,7 @@ pragma solidity ^0.8.0;
 // and allows keepers to be way lazier when calling the code
 // each address can deploy their own streaming contract
 
-contract lazyStreamer {
+contract LazyStreamer {
 
     address public peepoPay;
     address public admin;
@@ -70,7 +70,7 @@ contract lazyStreamer {
         if (dayQueue[firstDay].first < dayQueue[firstDay].last && firstDay <= lastDay) { // if there is a day
             // gets the indexes for the queue of that day
             uint256 _first = dayQueue[firstDay].first;
-            uint256 _last = dayQueue[firstDay].last;
+//            uint256 _last = dayQueue[firstDay].last;
             // gets the ID number
             uint256 _id = dayQueue[firstDay].IDs[_first];
             // clear data

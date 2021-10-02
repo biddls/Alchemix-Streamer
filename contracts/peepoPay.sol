@@ -6,7 +6,9 @@ import {IalcV2Vault} from "./interfaces/IalcV2Vault.sol";
 import {IpeepoPay} from "./interfaces/IpeepoPay.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IcustomRouter} from "./interfaces/IcustomRouter.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
+// todo: add permissioning
 // todo: integrate w Keep3r
 // done // needs testing // make sure that people can add an end date
 // done // custom cont routing
@@ -19,7 +21,8 @@ import {IcustomRouter} from "./interfaces/IcustomRouter.sol";
 // allow locking of streams to permission-ed addresses as part of streamPay
 
 // the lower feature version that requires more upkeep and complexity
-contract peepoPay {
+// ask spilli if it needs to be full camel case
+contract PeepoPay is AccessControl{
     // from => ID => stream
     // view function to return the IDs of all steams
     // swap into any erc-20 as well
@@ -27,24 +30,26 @@ contract peepoPay {
     // how much an address gets
     // fromAdr -> toAdr -> amount
     // this creates a many to many relationship but it only allows one stream for each pair of addresses
-//    mapping(address => mapping(address => stream)) public gets;
+    //    mapping(address => mapping(address => stream)) public gets;
     // so its going to get replaced with an ID system
-    mapping(address => mapping(uint256 => stream)) public gets;
+    mapping(address => mapping(uint256 => Stream)) public gets;
     // this means that now a single from address can find an index list of all of their streams
-
-    struct stream{
+    // update to
+    struct Stream {
         address payee; // this has been added in the ID system
         uint256 cps; // coins per second
         uint256 sinceLast; // unix time since the last withdrawl was made
         uint256 freq; // how often can they withdraw so 1 once a week would be 604800
         uint256 end;
-// can be set to 0 to replicate a system like sablier
-//        bool openDrawDown; //allows for minimal gas to be used to close the steam
+        // can be set to 0 to replicate a system like sablier
+        //        bool openDrawDown; //allows for minimal gas to be used to close the steam
         // i chose to remove openDrawDown because tbh its not useful and seems kinda pointless
         // im adding this field because it then allows custom routes for any stream
         // if its 0 then it skips it
         // if the route is empty then it has no reason to be run as there are no custom contracts to go through
+        // reentrancy security issues
         address[] route;
+        bytes32 ROLE;
     }
 
     // this allows the payer to know what index to search up to
@@ -61,12 +66,8 @@ contract peepoPay {
 
     // address of erc-20 coin used alAsset (alUSD ot alETH...)
     address public coinAddress;
-
-    // address of the admin
-    address public admin;
-
     constructor () {
-        admin = msg.sender;
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /*
@@ -74,7 +75,7 @@ contract peepoPay {
     */
     function changeAlcV2 (address _new) external {
         // only admin address can call this (could be changed to the multisig or DAO)
-        require(msg.sender == admin, "admin only");
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
         // cant set it to 0 address
         require(_new != address(0));
         // sets new address
@@ -90,7 +91,7 @@ contract peepoPay {
     */
     function setCoinAddress (address _new) external {
         // only admin can call this (could be changed to the multisig or DAO)
-        require(msg.sender == admin, "admin only");
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
         // the 0 address isnt a contract
         require(_new != address(0));
         // sets the address of the erc-20 token
@@ -99,17 +100,17 @@ contract peepoPay {
         emit coinAddressChanged(_new);
     }
 
-
     /*
     changes the address of the admin to something else
     */
     function changeAdmin (address _new) external {
         // only admin can call this (could be changed to the multisig or DAO)
-        require(msg.sender == admin, "admin only");
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
         // the 0 address isnt a contract
         require(_new != address(0));
         // sets the address of the admin
-        admin = _new;
+        grantRole(DEFAULT_ADMIN_ROLE, _new);
+        revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
         // emits a call
         emit adminChanged(_new);
     }
@@ -158,7 +159,6 @@ contract peepoPay {
         uint256 _freq, // uinx time
         uint256 _start, // unix time for it to start the stream on
         uint256 _end, // 0 means no end
-        bool _now,
         address[] memory _route
     // this can allow the creation of back pay or to start the stream next saturday
     ) external {
@@ -168,15 +168,13 @@ contract peepoPay {
         require(_cps > 0, "should not stream 0 coins");
         // gets the next stream ID number
         uint256 _nextID = streams[msg.sender];
-        // uses the mapping to set the steam up
-        _start = _now ? block.timestamp : _start;
-
-        gets[msg.sender][_nextID] = stream(_to, _cps, _start, _freq, _end, _route); // need to work on this
-
+        gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "");
+        gets[msg.sender][_nextID].ROLE = genRole(msg.sender, _nextID, gets[msg.sender][_nextID]);
+        grantRole(gets[msg.sender][_nextID].ROLE, msg.sender);
         // increments the number of streams from that address (starting from a 0)
         streams[msg.sender]++;
 
-        emit streamStarted(msg.sender, _nextID);
+        emit streamStarted(msg.sender, _nextID, _to);
     }
 
     /*
@@ -205,7 +203,7 @@ contract peepoPay {
     function closeStream(
         uint256 _id // the ID of the stream
     ) external {
-        gets[msg.sender][_id].cps = 0;
+        delete gets[msg.sender][_id];
         emit streamClosed(msg.sender, _id);
     }
 
@@ -260,6 +258,7 @@ contract peepoPay {
     /*
     need to add some way of telling the user what streams didnt work
     */
+    /*
     function drainStreams(
         address[] memory _payers, // address that gives
         uint256[] memory _IDs // addresses that feed into _to
@@ -295,116 +294,92 @@ contract peepoPay {
         }
 //        emit failedDrawDowns(failed, ids);
     }
+    */
 
 
     // not tested
     function drainStream (
         address _payer, // address that gives
         uint256 _ID // is of the stream
-    ) external {
-        stream memory _stream = gets[_payer][_ID];
-        // if the end of the stream is in the future or 0 (no end) then its okay
-        uint256 _amount;
-        if(_stream.end >= block.timestamp || _stream.end == 0){
-            // get amount its basically a min function `min(asking for, can offer)` and making sure that its allowed to
-            _amount = (_stream.freq + _stream.sinceLast) <= block.timestamp ?
-            (block.timestamp - _stream.sinceLast) * _stream.cps : 0;
-        } else { // else it has to allow people to draw down their remaining balance
-            _amount = (_stream.freq + _stream.sinceLast) <= _stream.end ?
-            (_stream.end - _stream.sinceLast) * _stream.cps : 0;
-        }
-        bool success = customContRouter(_stream, _payer, _ID, _amount);
-        // IDFK
-/*            if(!success){
-                failed.push(_payers[i]);
-                ids.push(_IDs[i]);
-            }
+    ) external returns (bool success){
+        Stream memory _stream = gets[_payer][_ID];
+        require(hasRole(genRole(_payer, _ID, _stream), msg.sender), "addr dont have access");
 
-        emit failedDrawDowns(failed, ids);
-*/
-    }
+        uint256 _amount = streamSize(_payer, _ID);
 
-    function customContRouter (
-        stream memory _stream,
-        address _payer,
-        uint256 _ID,
-        uint256 _amount
-    ) internal returns (bool success){
-        bytes memory returnData;
-        if(_stream.route.length == 0){
-            // if it is not a custom contract
-            // calls the borrow function in V2
-            (success, returnData) = _amount > 0 ? address(adrAlcV2).call( // if they are goin to get more than 0 coins
-            // then they are okay if they will get 0 coins then dont call the function
-                abi.encodePacked(
-                    IalcV2Vault.mintFrom.selector,
-                    abi.encode(
-                        _payer,
-                        _amount, _stream.payee
-                    )
-                )
-            ) : (false, bytes("0x")); // this bit here says that if your calling it to soon then you auto fail
-            // if its successful then update the streams data
-            if (success) { //cant test V2 yet
-                gets[_payer][_ID].sinceLast += block.timestamp;
-                // needs work idk how people want this to behave
-            }
-        } else {
-            // if it is a custom contract
+        // if it is not a custom contract
+        // calls the borrow function in V2
+        IalcV2Vault(adrAlcV2).mintFrom(
+            _payer,
+            _amount,
+            _stream.route.length > 0 ? _stream.route[0] : _stream.payee
+        );
+
+        gets[_payer][_ID].sinceLast += block.timestamp;
+
+        if(_stream.route.length > 0){
             /*
+            // if it is a custom contract
             this allows for people to route funds though custom contracts
             like if you want to swap it to something or deposit into another protocol or anything
+            // no risk of reentrancy as nothing else in the contract after this relies on the contracts own internal data
             */
-            // calls the borrow function in V2
-            (success, returnData) = _amount > 0 ? address(adrAlcV2).call( // if they are goin to get more than 0 coins
-            // then they are okay if they will get 0 coins then dont call the function
-                abi.encodePacked(
-                    IalcV2Vault.mintFrom.selector,
-                    abi.encode(
-                        _payer,
-                        _amount, _stream.route[0] //send it to this contract so it can then pass it on to the customCont
-                    )
-                )
-            ) : (false, bytes("0x")); // this bit here says that if your calling it to soon then you auto fail
-            if(success && _stream.route.length > 0){
+            IcustomRouter(_stream.route[0]).route(
+                coinAddress,
+                _stream.payee,
+                _amount,
+                _stream.route,
+                1);
 
-                (success, returnData) = _amount > 0 ? address(_stream.route[0]).call( // if they are goin to get more than 0 coins
-                // then they are okay if they will get 0 coins then dont call the function
-                    abi.encodePacked(
-                        IcustomRouter.route.selector,
-                        abi.encode(
-                            coinAddress,
-                            _stream.payee,
-                            _amount, //calls the custom contract to then start the process
-                            _stream.route,
-                            1
-                        )
-                    )
-                ) : (false, bytes("0x")); // this bit here says that if your calling it to soon then you auto fail
-                if(success){
-                    uint256 _balance = IERC20(coinAddress).balanceOf(_stream.route[0]);
-
-                    if(_balance == 0){
-                        gets[_payer][_ID].sinceLast = block.timestamp;
-                    }
-                }
-            }
+            require(0 == IERC20(coinAddress).balanceOf(_stream.route[0]), "Coins did not move on");
         }
         return success;
     }
 
-    event streamStarted (
-        address from,
-        uint256 indexed ID
-    );
+    // view function to tell it how much it will receive for a given address and ID of stream
+    function streamSize(
+        address _payer, // address that gives
+        uint256 _ID // is of the stream
+    ) view public returns (uint256 _amount){
+        Stream memory _stream = gets[_payer][_ID];
+        if(_stream.end >= block.timestamp || _stream.end == 0){
+            _amount = (_stream.freq + _stream.sinceLast) <= block.timestamp ?
+            (block.timestamp - _stream.sinceLast) * _stream.cps : 0;
+        } else {
+            _amount = (_stream.freq + _stream.sinceLast) <= _stream.end ?
+            (_stream.end - _stream.sinceLast) * _stream.cps : 0;
+        }
+    }
 
-    event failedDrawDowns (
-        address[] froms,
-        uint256[] IDs
+    function genRole(
+        address _from,
+        uint256 _ID,
+        Stream memory _stream
+    ) pure public returns (bytes32 _ROLE){
+        return keccak256(abi.encodePacked(_from, _ID, _stream.payee, _stream.cps, _stream.freq, _stream.end));
+    }
+
+    function streamPermGrant(uint256 _ID, address _account) external {
+        grantRole(streamRoleChngChecks(_ID, _account), _account);
+    }
+
+    function streamPermRevoke(uint256 _ID, address _account) external {
+        revokeRole(streamRoleChngChecks(_ID, _account), _account);
+    }
+
+    function streamRoleChngChecks(uint256 _ID, address _account) view internal returns (bytes32){
+        require(msg.sender != _account);
+        return genRole(msg.sender, _ID, gets[msg.sender][_ID]);
+    }
+
+    event streamStarted (
+        address indexed from,
+        uint256 indexed ID,
+        address indexed to
     );
 
     event streamClosed (
-        address from, // not sure if this one is needed
+        address indexed from, // not sure if this one is needed
         uint256 indexed ID
     );
 

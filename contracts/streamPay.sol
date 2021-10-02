@@ -2,16 +2,16 @@
 
 pragma solidity ^0.8.0;
 
-import {lazyStreamer} from "./lazyStreamer.sol";
+import {LazyStreamer} from "./lazyStreamer.sol";
 import {IpeepoPay} from "./interfaces/IpeepoPay.sol";
 
 // the larger version of peepopay with more management tooling
-contract streamPay {
+contract StreamPay {
 
     address public peepoPayCont;
 
     // set up account to allow users to create a lazystreamer contract for their account
-    mapping(address => lazyStreamer) public accounts;
+    mapping(address => LazyStreamer) public accounts;
 
     constructor (address _peepoPay){
         peepoPayCont = _peepoPay;
@@ -23,7 +23,7 @@ contract streamPay {
         assigns the mapping so that this
         contract can reference it later
         */
-        accounts[msg.sender] = new lazyStreamer(peepoPayCont);
+        accounts[msg.sender] = new LazyStreamer(peepoPayCont);
     }
 
     // manage permissions for the account
@@ -41,13 +41,13 @@ contract streamPay {
     }
 
     // call the lazy draw down function
-    function lazyDrawdown(address _account) external {
+    function lazyDrawdown(address _account, uint256 _id) external {
         // makes sure the account exists
         require(address(accounts[_account]) != address(0));
         // gets the index of the first day var
         uint256 _firstDay = accounts[_account].firstDay();
-        // gets the next item on the list
-        uint256 _id = accounts[_account].pop();
+//        // gets the next item on the list
+//        uint256 _id = accounts[_account].pop();
         // drains the stream from the
         IpeepoPay(peepoPayCont).drainStream(_account, _id);
         // get how often its called

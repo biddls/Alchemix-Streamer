@@ -42,7 +42,7 @@ contract router{
         uint256[] memory _amounts) external {
 
         // drain streams
-        (bool success, bytes memory returnDataDrainStreams) =
+        (bool success, ) =
         address(streamer).call(
             abi.encodePacked(
                 IpeepoPay.drainStreams.selector,

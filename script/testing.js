@@ -6,7 +6,7 @@ const testing = async function() {
 
     // testing stuff
     // streamer
-    let contract = await ethers.getContractFactory("peepoPay");
+    let contract = await ethers.getContractFactory("PeepoPay");
     const peepoPay = await contract.deploy();
 
     // streamer.changeAlcV2(addr1.address);
@@ -36,7 +36,7 @@ const testing = async function() {
     );
 
     // streamPay
-    contract = await ethers.getContractFactory("streamPay");
+    contract = await ethers.getContractFactory("StreamPay");
     const streamPay = await contract.deploy(peepoPay.address);
 
     // setting stuff up to plug into one another
