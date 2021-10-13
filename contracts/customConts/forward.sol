@@ -15,9 +15,9 @@ contract Forward { //call it what ever you want
     function route(address _coinAddr, address _to, uint256 _amount, address[] memory _route, uint256 _current) external{
         // Put code here that is run regardless of position in the route
         if(_route.length > _current){
+            require(_route[_current] != address(this), "Cannot route to self");
             // put something here if you are running code in the middle of the route
             IERC20(_coinAddr).transfer(_route[_current], _amount);
-            require(_route[_current] != address(this), "Cannot route to self");
             (bool success, bytes memory returnData) = address(_route[_current]).call(
                 abi.encodePacked(
                     this.route.selector,
