@@ -41,13 +41,7 @@ interface IpeepoPay {
         uint256 _id
     ) external;
 
-    function drainStreams (
-        address[] memory _payers,
-        uint256[] memory _IDs,
-        uint256[] memory _amounts
-    ) external;
-
-    function drainStream (
+    function drawDownStream (
         address _payer,
         uint256 _ID
     ) external;

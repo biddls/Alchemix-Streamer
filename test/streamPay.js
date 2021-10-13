@@ -27,7 +27,7 @@ describe("streamPay", function () {
             await vars.streamPay.accountCreation();
 
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, 0, 0, []);
+                vars.addr1.address, 1, 0, 0, 0, []);
 
             await vars.streamPay.populate(1, [0]);
         });
@@ -66,7 +66,7 @@ describe("streamPay", function () {
             await vars.streamPay.accountCreation();
 
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, 0, 0, []);
+                vars.addr1.address, 1, 0, 0, 0, []);
 
             await vars.streamPay.populate(1, [0]);
 

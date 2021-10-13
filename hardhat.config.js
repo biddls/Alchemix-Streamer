@@ -30,4 +30,5 @@ module.exports = {
     enabled: process.env.REPORT_GAS
   }
   // npx hardhat coverage
+  // yarn hardhat gen-interface <contract name>
 };

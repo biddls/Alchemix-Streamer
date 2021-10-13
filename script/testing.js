@@ -14,15 +14,15 @@ const testing = async function() {
     // streamer.changeAdmin(addr3.address);
 
     // deployer
-    contract = await ethers.getContractFactory("deployer");
+    contract = await ethers.getContractFactory("Deployer");
     const deployer = await contract.deploy();
 
     //testing custom conts
-    contract = await ethers.getContractFactory("forward");
+    contract = await ethers.getContractFactory("Forward");
     const forward = await contract.deploy();
-    contract = await ethers.getContractFactory("forwardBroken");
+    contract = await ethers.getContractFactory("ForwardBroken");
     const forwardBroken = await contract.deploy();
-    contract = await ethers.getContractFactory("reverts");
+    contract = await ethers.getContractFactory("Reverts");
     const reverts = await contract.deploy();
 
     // fake V2 contract

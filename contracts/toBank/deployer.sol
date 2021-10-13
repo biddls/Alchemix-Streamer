@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import "./router.sol";
 
-contract deployer {
+contract Deployer {
 
     router internal _routerCont;
 

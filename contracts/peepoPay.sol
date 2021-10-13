@@ -8,20 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IcustomRouter} from "./interfaces/IcustomRouter.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
-// todo: add permissioning
-// todo: integrate w Keep3r
-// done // needs testing // make sure that people can add an end date
-// done // custom cont routing
-                            // coin addr
-                            // to addr
-                            // amount
-                            // address[] route
-// done // needs bug fixing // emit failed draw down of streams
-// 1/2 done // lazy update system
-// allow locking of streams to permission-ed addresses as part of streamPay
-
 // the lower feature version that requires more upkeep and complexity
-// ask spilli if it needs to be full camel case
 contract PeepoPay is AccessControl{
     // from => ID => stream
     // view function to return the IDs of all steams
@@ -41,13 +28,14 @@ contract PeepoPay is AccessControl{
         uint256 sinceLast; // unix time since the last withdrawl was made
         uint256 freq; // how often can they withdraw so 1 once a week would be 604800
         uint256 end;
-        // can be set to 0 to replicate a system like sablier
+        /* can be set to 0 to replicate a system like sablier
         //        bool openDrawDown; //allows for minimal gas to be used to close the steam
         // i chose to remove openDrawDown because tbh its not useful and seems kinda pointless
         // im adding this field because it then allows custom routes for any stream
         // if its 0 then it skips it
         // if the route is empty then it has no reason to be run as there are no custom contracts to go through
-        // reentrancy security issues
+        */
+        //reentrancy security issues
         address[] route;
         bytes32 ROLE;
     }
@@ -117,8 +105,6 @@ contract PeepoPay is AccessControl{
 
     /*
     this is the code that i wrote first time it doesnt use the ID system
-    */
-/*
     // create stream
     function createStream(
         uint256 _cps, // coins per second
@@ -154,8 +140,8 @@ contract PeepoPay is AccessControl{
     and adr A send B 100 per week
     */
     function createStream(
-        uint256 _cps, // coins per second
         address _to, // the payee
+        uint256 _cps, // coins per second
         uint256 _freq, // uinx time
         uint256 _start, // unix time for it to start the stream on
         uint256 _end, // 0 means no end
@@ -179,9 +165,6 @@ contract PeepoPay is AccessControl{
 
     /*
     this is the old code before the ID bases system
-    */
-    // close stream
-/*
     function closeStream(address _to) external {
         // cant close a stream to the 0 addr
         require(_to != address(0), "cannot stream to 0 address");
@@ -197,9 +180,7 @@ contract PeepoPay is AccessControl{
     }
 */
 
-    /*
-    new function that uses the ID system
-    */
+    // new function that uses the ID system
     function closeStream(
         uint256 _id // the ID of the stream
     ) external {
@@ -209,8 +190,6 @@ contract PeepoPay is AccessControl{
 
     /*
     this is the previous thing that allowed the draw downs
-    */
-/*
     // draw down from stream //temp adj for testing
     function drainStreams(address _to, // address that receives
         address[] memory _arrayOfStreamers, // addresses that feed into _to
@@ -254,11 +233,8 @@ contract PeepoPay is AccessControl{
         return _amount; // need to test
     }
 */
-
     /*
     need to add some way of telling the user what streams didnt work
-    */
-    /*
     function drainStreams(
         address[] memory _payers, // address that gives
         uint256[] memory _IDs // addresses that feed into _to
@@ -296,9 +272,8 @@ contract PeepoPay is AccessControl{
     }
     */
 
-
     // not tested
-    function drainStream (
+    function drawDownStream(
         address _payer, // address that gives
         uint256 _ID // is of the stream
     ) external returns (bool success){
@@ -312,6 +287,7 @@ contract PeepoPay is AccessControl{
         IalcV2Vault(adrAlcV2).mintFrom(
             _payer,
             _amount,
+        // this either sends the funds to the 1st custom cont or payee depending on if there is a route or not
             _stream.route.length > 0 ? _stream.route[0] : _stream.payee
         );
 
@@ -324,6 +300,9 @@ contract PeepoPay is AccessControl{
             like if you want to swap it to something or deposit into another protocol or anything
             // no risk of reentrancy as nothing else in the contract after this relies on the contracts own internal data
             */
+            //##############################
+            //###RISK OF REENTERANCY HERE###
+            //##############################
             IcustomRouter(_stream.route[0]).route(
                 coinAddress,
                 _stream.payee,
@@ -342,7 +321,7 @@ contract PeepoPay is AccessControl{
         uint256 _ID // is of the stream
     ) view public returns (uint256 _amount){
         Stream memory _stream = gets[_payer][_ID];
-        if(_stream.end >= block.timestamp || _stream.end == 0){
+        if((_stream.end >= block.timestamp) || (_stream.end == 0)){
             _amount = (_stream.freq + _stream.sinceLast) <= block.timestamp ?
             (block.timestamp - _stream.sinceLast) * _stream.cps : 0;
         } else {
@@ -362,13 +341,11 @@ contract PeepoPay is AccessControl{
     function streamPermGrant(uint256 _ID, address _account) external {
         grantRole(streamRoleChngChecks(_ID, _account), _account);
     }
-
     function streamPermRevoke(uint256 _ID, address _account) external {
         revokeRole(streamRoleChngChecks(_ID, _account), _account);
     }
-
     function streamRoleChngChecks(uint256 _ID, address _account) view internal returns (bytes32){
-        require(msg.sender != _account);
+        require(msg.sender != _account, "no access allowed");
         return genRole(msg.sender, _ID, gets[msg.sender][_ID]);
     }
 

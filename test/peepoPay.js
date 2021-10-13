@@ -59,7 +59,7 @@ describe("peepoPay", function () {
         it("Create stream", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, 0, 0, []);
+                vars.addr1.address, 1, 0, 0, 0, []);
             expect((await vars.peepoPay.gets(
                 vars.owner.address, 0))[0])
                 .to.equal(vars.addr1.address);
@@ -75,19 +75,19 @@ describe("peepoPay", function () {
         it("dont stream to 0 address", async function () {
             // v2 code here to get approval for the contract to draw down
             await expect(vars.peepoPay.createStream(
-                1, zero_address, 0, 0, 0, [])).to.be.revertedWith("cannot stream to 0 address");
+                zero_address,1,  0, 0, 0, [])).to.be.revertedWith("cannot stream to 0 address");
         });
         it("streams CPS > 0", async function () {
             // v2 code here to get approval for the contract to draw down
             await expect(vars.peepoPay.createStream(
-                0, vars.addr1.address, 0, 0, 0, [])).to.be.revertedWith("should not stream 0 coins");
+                vars.addr1.address,0,  0, 0, 0, [])).to.be.revertedWith("should not stream 0 coins");
         });
     });
     describe("closing stream", async function () {
         it("Close stream", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, 0, 0, []);
+                vars.addr1.address,1,  0, 0, 0, []);
             // await vars.v2.setLimit(100);
 
             expect((await vars.peepoPay.gets(
@@ -106,22 +106,20 @@ describe("peepoPay", function () {
         it("Normal drawing down", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.peepoPay.createStream(
-                1000, vars.addr1.address,0, now(), now() + 1, []);
+                vars.addr1.address, 1000, 0, now()-10, now()+10, []);
 
-            await vars.v2.setLimit(1000);
+            await vars.v2.setLimit(100000);
 
-            vars.peepoPay.drainStream(
+            vars.peepoPay.drawDownStream(
                 vars.owner.address,
                 0);
         });
         it("draw down too soon", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.peepoPay.createStream(
-                1000, vars.addr1.address, 10, now(), now(), []);
+                vars.addr1.address, 1, 0, now()-10, now()*10000, []);
 
-            await vars.v2.setLimit(1000);
-
-            await vars.peepoPay.drainStream(
+            await vars.peepoPay.streamSize(
                 vars.owner.address,
                 0);
         });
@@ -129,31 +127,41 @@ describe("peepoPay", function () {
     describe("custom contract interactions", async function () {
         it("basic forwarding contract", async function () {
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, now(), now() + 1, [vars.forward.address]);
+                vars.addr1.address,1,  0, now(), now() + 1, [vars.forward.address]);
 
             await vars.v2.setLimit(100);
 
-            await vars.peepoPay.drainStream(
+            await vars.peepoPay.drawDownStream(
+                vars.owner.address,
+                0);
+        });
+        it("multi forwarding contract", async function () {
+            await vars.peepoPay.createStream(
+                vars.addr1.address,1,  0, now(), now() + 1, [vars.forward.address, vars.forward.address]);
+
+            await vars.v2.setLimit(100);
+
+            await vars.peepoPay.drawDownStream(
                 vars.owner.address,
                 0);
         });
         it("basic broken forwarding contract", async function () {
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, now(), now() + 1, [vars.forwardBroken.address]);
+                vars.addr1.address,1,  0, now(), now() + 1, [vars.forwardBroken.address]);
 
             await vars.v2.setLimit(100);
 
-            await expect (vars.peepoPay.drainStream(
+            await expect (vars.peepoPay.drawDownStream(
                 vars.owner.address,
                 0)).to.be.revertedWith("Coins did not move on");
         });
         it("all this one does is revert", async function () {
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, now(), now() + 1, [vars.reverts.address]);
+                vars.addr1.address, 1, 0, now(), now() + 1, [vars.reverts.address]);
 
             await vars.v2.setLimit(100);
 
-            await expect (vars.peepoPay.drainStream(
+            await expect (vars.peepoPay.drawDownStream(
                 vars.owner.address,
                 0)).to.be.reverted;
         });
@@ -161,21 +169,21 @@ describe("peepoPay", function () {
     describe("V2", async function () {
         it("got enough funds",async function () {
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, now(), now() + 1, []);
+                vars.addr1.address, 1, 0, now(), now() + 1, []);
 
             await vars.v2.setLimit(100);
 
-            await vars.peepoPay.drainStream(
+            await vars.peepoPay.drawDownStream(
                 vars.owner.address,
                 0);
         });
         it("not enough funds", async function () {
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, now(), now() + 1, []);
+                vars.addr1.address, 1, 0, now(), now() + 1, []);
 
             await vars.v2.setLimit(0);
 
-            await expect( vars.peepoPay.drainStream(
+            await expect( vars.peepoPay.drawDownStream(
                 vars.owner.address,
                 0)).to.be.revertedWith("allowance not large enough");
         });
@@ -183,28 +191,35 @@ describe("peepoPay", function () {
     describe("stream role changing", async function () {
         it("streamPermGrant",async function () {
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, now(), now() + 1, []);
+                vars.addr1.address, 1, 0, now(), now() + 1, []);
 
             await vars.v2.setLimit(10);
 
             await vars.peepoPay.streamPermGrant(0, vars.addr1.address);
 
-            await vars.peepoPay.connect(vars.addr1).drainStream(
+            await vars.peepoPay.connect(vars.addr1).drawDownStream(
                 vars.owner.address,
                 0);
         });
         it("streamPermRevoke", async function () {
             await vars.peepoPay.createStream(
-                1, vars.addr1.address, 0, now(), now() + 1, []);
+                vars.addr1.address, 1, 0, now(), now() + 1, []);
 
             await vars.v2.setLimit(10);
 
             await vars.peepoPay.streamPermGrant(0, vars.addr1.address);
             await vars.peepoPay.streamPermRevoke(0, vars.addr1.address);
 
-            await expect( vars.peepoPay.connect(vars.addr1).drainStream(
+            await expect( vars.peepoPay.connect(vars.addr1).drawDownStream(
                 vars.owner.address,
                 0)).to.be.revertedWith("addr dont have access");
+        });
+        it("streamPermRevoke no right", async function () {
+            await vars.peepoPay.createStream(
+                vars.addr1.address, 1, 0, now(), now() + 1, []);
+
+            await expect (vars.peepoPay.connect(vars.addr1).streamPermGrant(
+                0, vars.addr1.address)).to.be.revertedWith("no access allowed");
         });
     });
 });
