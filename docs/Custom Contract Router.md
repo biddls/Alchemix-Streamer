@@ -1,8 +1,8 @@
-#Custom Contract Routing
+<h1>Custom Contract Routing</h1>
 
 ---
 
-###Route Function
+<h3>Route Function</h3>
 ```solidity
 function route(
     address _coinAddr,
@@ -18,7 +18,7 @@ function route(
  - `_route`: the list of contract addresses that the money goes through 
  - `current`: the index of where in the list the contract is so it knows how to get the address of the next contract
 
-###But you don't need to worry about that:
+<h3>But you don't need to worry about that:</h3>
 If your going to make a chain in the contract all you need to worry about is as follows. Take a basic Route contract:
 and fill in lines 0-4
 ```solidity
