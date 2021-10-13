@@ -145,6 +145,16 @@ describe("peepoPay", function () {
                 vars.owner.address,
                 0);
         });
+        it("multi forwarding contract recursive", async function () {
+            await vars.peepoPay.createStream(
+                vars.addr1.address,1,  0, now(), now() + 1, [vars.forward.address, vars.forward.address]);
+
+            await vars.v2.setLimit(100);
+
+            await expect( vars.peepoPay.drawDownStream(
+                vars.owner.address,
+                0)).to.be.revertedWith("Cannot route to self");
+        });
         it("basic broken forwarding contract", async function () {
             await vars.peepoPay.createStream(
                 vars.addr1.address,1,  0, now(), now() + 1, [vars.forwardBroken.address]);

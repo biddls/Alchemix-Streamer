@@ -25,25 +25,27 @@ If your going to make a chain in the contract all you need to worry about is as 
 pragma solidity ^0.8.0;
 
 // import any interfaces you need
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract ContFoo { //call it what ever you want
     // main function that gets called to activate the next step
     function route(address _coinAddr, address _to, uint256 _amount, address[] memory _route, uint256 _current) external{
         // Put code here that is run regardless of position in the route
-        if(_route.length > _current + 1){
+        if(_route.length > _current){
             // put something here if you are running code in the middle of the route
-            (bool success, bytes memory returnData) = address(_current++).call(
+            require(_route[_current] != address(this), "Cannot route to self");
+            (bool success, bytes memory returnData) = address(_route[_current]).call(
                 abi.encodePacked(
                     this.route.selector,
-                    abi.encode(_coinAddr, _to, _amount, _route, _current++)));
-            require(success);
-            // if your being a good shadowy super coder put something here that checks that the next step in the route
-            // moved the funds on so things are less likely to fail successfully e.g.
-            require(IERC20(_coinAddr).balanceOf(_route[_current++]) == 0);
+                    abi.encode(_coinAddr, _to, _amount, _route, _current + 1)));
+            require(success, string(returnData));
+            /*
+            if your being a good shadowy super coder put something here that checks that the next step in the route
+            moved the funds on so things are less likely to fail successfully e.g.
+            */
         } else {
             // put code here if you are running code as the last step in the route
         }
     }
 }
 ```
+If you want more examples that have been used in testing see [here](./../contracts/customConts)
