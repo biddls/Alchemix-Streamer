@@ -1,7 +1,5 @@
 <h1>Better capital efficiently, Better memes; PeepoPay</h1>
 
----
-
 <h2>PeepoPay comprises of 3 main functions:</h2>
  - [Create Stream](#create-stream)
  - [Collect Stream](#draw-down-stream)

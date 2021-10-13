@@ -1,8 +1,7 @@
 <h1>Custom Contract Routing</h1>
 
----
-
 <h3>Route Function</h3>
+
 ```solidity
 function route(
     address _coinAddr,
@@ -12,6 +11,7 @@ function route(
     uint256 current
 ) external;
 ```
+
  - `_coinAddr`: the address of the erc-20 coin that it has received
  - `_to`: the end address of who will receive the coins
  - `_amount`: the amount of coins the contract received from the previous step
@@ -21,6 +21,7 @@ function route(
 <h3>But you don't need to worry about that:</h3>
 If your going to make a chain in the contract all you need to worry about is as follows. Take a basic Route contract:
 and fill in lines 0-4
+
 ```solidity
 pragma solidity ^0.8.0;
 
@@ -49,5 +50,6 @@ contract ContFoo { // #0# call it what ever you want
     }
 }
 ```
+
 If you want more examples that have been used in testing see [here](./../contracts/customConts)
 EZ
