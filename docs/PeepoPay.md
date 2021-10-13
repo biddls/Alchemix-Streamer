@@ -7,6 +7,7 @@
  - [Close Stream](#close-stream)
 
 <h3>Create Stream</h3>
+
 Stream comprises of 6 Parts and be set up by anyone:  
 1. `to`: Who you're sending the money to  
 2. `cps`: How much money your sending per second  
@@ -16,12 +17,14 @@ Stream comprises of 6 Parts and be set up by anyone:
 6. `route`: Allows the chaining of contracts to do the same set of steps each time the stream is drawn down
 
 <h3>Collect Stream</h3>
+
 Collecting the stream has 2 main parts:
 1. `V2`: This draws down the funds and then sends them to the receiver if they don't have a route, but if they do have 
    a route then it sends it to the 1st contract on the route
 2. `Route`: If there is a route to be taken then it calls the first contract, see: [Custom Contract Router](./Custom%20Contract%20Router.md)
 
 <h3>Close Stream</h3>
+
 This deletes all data from the listing from the contract so meaning everything goes to 0; meaning no coins can be 
 emitted, and it would route to the 0 address by default
 

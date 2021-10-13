@@ -19,6 +19,7 @@ function route(
  - `current`: the index of where in the list the contract is so it knows how to get the address of the next contract
 
 <h3>But you don't need to worry about that:</h3>
+
 If your going to make a chain in the contract all you need to worry about is as follows. Take a basic Route contract:
 and fill in lines 0-4
 
