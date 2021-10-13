@@ -4,7 +4,7 @@
 
 ##PeepoPay comprises of 3 main functions:
  - [Create Stream](#create-stream)
- - [Draw Down Stream](#draw-down-stream)
+ - [Collect Stream](#draw-down-stream)
  - [Close Stream](#close-stream)
 
 ###Create Stream

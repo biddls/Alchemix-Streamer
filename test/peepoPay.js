@@ -137,7 +137,7 @@ describe("peepoPay", function () {
         });
         it("multi forwarding contract", async function () {
             await vars.peepoPay.createStream(
-                vars.addr1.address,1,  0, now(), now() + 1, [vars.forward.address, vars.forward.address]);
+                vars.addr1.address,1,  0, now(), now() + 1, [vars.forward.address, vars.forward2.address]);
 
             await vars.v2.setLimit(100);
 

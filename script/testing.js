@@ -20,6 +20,8 @@ const testing = async function() {
     //testing custom conts
     contract = await ethers.getContractFactory("Forward");
     const forward = await contract.deploy();
+    contract = await ethers.getContractFactory("Forward");
+    const forward2 = await contract.deploy();
     contract = await ethers.getContractFactory("ForwardBroken");
     const forwardBroken = await contract.deploy();
     contract = await ethers.getContractFactory("Reverts");
@@ -52,6 +54,7 @@ const testing = async function() {
         streamPay,
         deployer,
         forward,
+        forward2,
         forwardBroken,
         reverts,
         v2,
