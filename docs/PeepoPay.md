@@ -33,3 +33,5 @@ emitted, and it would route to the 0 address by default
 1. Download interface file from [here](./../contracts/interfaces/IpeepoPay.sol)
 2. Get the contract address from [here](./ContractAddresses.md)
 3. Begin making function calls to the contract and remeber the risk of re-enterancy with the custom contract routing
+
+To see a complete list of interface functions for PeepoPay see [here](.././contracts/interfaces/IpeepoPay.sol)

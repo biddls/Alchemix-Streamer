@@ -55,7 +55,7 @@ contract StreamPay {
         IpeepoPay(peepoPayCont).drawDownStream(_account, _id);
         // get how often its called
         // _secondsInDay = 86400
-        ( , , , uint256 _freq) = IpeepoPay(peepoPayCont).gets(_account, _id);
+        ( , , , uint256 _freq, , ) = IpeepoPay(peepoPayCont).gets(_account, _id);
         _freq = _freq < 86400 ? 0 : (_freq / 86400) - 1;
         // ^ this takes how often its supposed to happen converts it into days and subtracts 1 meaning
         // 0 or 1 days it does not matter it happens tomorrow
