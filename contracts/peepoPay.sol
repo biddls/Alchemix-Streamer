@@ -135,7 +135,6 @@ contract PeepoPay is AccessControl{
     /// @param _id the ID of the stream
     /// @param _emergencyClose A bool that either allows for back pay or does not
     /// @param _end if back pay is allowed, until when?
-    /// ## NOT TESTED YET ##
     function editStream(
         uint256 _id, // the ID of the stream
         bool _emergencyClose,
@@ -161,16 +160,18 @@ contract PeepoPay is AccessControl{
     // the ID but a higher priority can dip into the buckets of lower IDs
     // todo: allow priorities to be changed
 
+    /// @notice Allows an approved address to collect a stream
+    /// @param _payer the address that gives
+    /// @param _ID the ID of the stream
     function collectStream(
-        address _payer, // address that gives
-        uint256 _ID // is of the stream
+        address _payer,
+        uint256 _ID
     ) external returns (bool success){
         Stream memory _stream = gets[_payer][_ID];
         require(hasRole(genRole(_payer, _ID, _stream), msg.sender), "addr dont have access");
         success = _collectStream(_payer, _ID);
     }
 
-    // not tested
     function _collectStream(
         address _payer, // address that gives
         uint256 _ID // is of the stream
