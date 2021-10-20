@@ -33,9 +33,11 @@ interface IpeepoPay is IAccessControl {
         address _new
     ) external;
 
-    // allows the caller to close the stream of a specific ID
-    function closeStream (
-        uint256 _id
+    // allows the caller to edit the stream of a specific ID
+    function editStream(
+        uint256 _id, // the ID of the stream
+        bool _emergencyClose,
+        uint256 _end
     ) external;
 
     // returns the address of the coin it will receive from V2 that it is borrowing against
@@ -60,7 +62,7 @@ interface IpeepoPay is IAccessControl {
     ) external;
 
     // allows anyone with the permissions to, to collect the stream to the router to what ever address its directed to
-    function drawDownStream (
+    function collectStream (
         address _payer,
         uint256 _ID
     ) external returns (

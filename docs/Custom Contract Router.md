@@ -65,10 +65,12 @@ contract ContFoo { // #0# call it what ever you want
 ```
 
 Remember that your contract can be used by other people in what ever way they want so make sure that:
-1. It will work at the end or in the middel of the chain
-2. If a user has set up a weird chain that doesn't work thats not your fault but you must make sure that you fail safely
-3. For most contracts it should hold no internal state that is affected by previous routing unless your trying to do 
+1. Watch out for reentrancy!
+2. It will work at the beginning, end or in the middle of the chain
+3. If a user has set up a weird chain that doesn't work that's not your fault but you should make sure that you fail 
+   safely
+4. For most contracts it should hold no internal state that is affected by previous routing unless your trying to do 
    something funky but that would be the exception not the norm
-4. Dont put any fees in there as someone will just fork you and re-deploy with 0 fees
+5. Dont put any fees in there as someone will just fork you and re-deploy with 0 fees
 If you want more examples that have been used in testing see [here](./../contracts/customConts)  
 EZ

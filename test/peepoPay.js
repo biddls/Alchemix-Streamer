@@ -83,22 +83,34 @@ describe("peepoPay", function () {
                 vars.addr1.address,0,  0, 0, 0, [])).to.be.revertedWith("should not stream 0 coins");
         });
     });
-    describe("closing stream", async function () {
-        it("Close stream", async function () {
+    describe("edit stream", async function () {
+        it("nice close", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.peepoPay.createStream(
-                vars.addr1.address,1,  0, 0, 0, []);
-            // await vars.v2.setLimit(100);
+                vars.addr1.address, 1, 0, now()-10, now()+10, []);
 
-            expect((await vars.peepoPay.gets(
-                vars.owner.address, vars.addr1.address))[1])
-                .to.equal(BigInt("0"));
-            // cant get the time one to behave but it seems to be working fine
-            expect((await vars.peepoPay.gets(
-                vars.owner.address, vars.addr1.address))[1])
-                .to.equal(BigInt("0"));
+            await vars.v2.setLimit(100000);
+            await expect(vars.peepoPay.editStream(0, false, now()-3))
+                .to.emit(vars.peepoPay, 'streamClosed');
+        });
+        it("extend stream", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await vars.peepoPay.createStream(
+                vars.addr1.address, 1, 0, now()-10, now()+10, []);
 
-            await expect(vars.peepoPay.closeStream(1))
+            await vars.v2.setLimit(100000);
+
+            await expect(vars.peepoPay.editStream(0, false, now()*2))
+                .to.not.emit(vars.peepoPay, 'streamClosed');
+        });
+        it("emergency close", async function () {
+            // v2 code here to get approval for the contract to draw down
+            await vars.peepoPay.createStream(
+                vars.addr1.address, 1, 0, now()-10, now()+10, []);
+
+            await vars.v2.setLimit(100000);
+
+            await expect(vars.peepoPay.editStream(0, true, 0))
                 .to.emit(vars.peepoPay, 'streamClosed');
         });
     });
@@ -110,7 +122,7 @@ describe("peepoPay", function () {
 
             await vars.v2.setLimit(100000);
 
-            vars.peepoPay.drawDownStream(
+            vars.peepoPay.collectStream(
                 vars.owner.address,
                 0);
         });
@@ -131,7 +143,7 @@ describe("peepoPay", function () {
 
             await vars.v2.setLimit(100);
 
-            await vars.peepoPay.drawDownStream(
+            await vars.peepoPay.collectStream(
                 vars.owner.address,
                 0);
         });
@@ -141,7 +153,7 @@ describe("peepoPay", function () {
 
             await vars.v2.setLimit(100);
 
-            await vars.peepoPay.drawDownStream(
+            await vars.peepoPay.collectStream(
                 vars.owner.address,
                 0);
         });
@@ -151,7 +163,7 @@ describe("peepoPay", function () {
 
             await vars.v2.setLimit(100);
 
-            await expect( vars.peepoPay.drawDownStream(
+            await expect( vars.peepoPay.collectStream(
                 vars.owner.address,
                 0)).to.be.revertedWith("Cannot route to self");
         });
@@ -161,7 +173,7 @@ describe("peepoPay", function () {
 
             await vars.v2.setLimit(100);
 
-            await expect (vars.peepoPay.drawDownStream(
+            await expect (vars.peepoPay.collectStream(
                 vars.owner.address,
                 0)).to.be.revertedWith("Coins did not move on");
         });
@@ -171,7 +183,7 @@ describe("peepoPay", function () {
 
             await vars.v2.setLimit(100);
 
-            await expect (vars.peepoPay.drawDownStream(
+            await expect (vars.peepoPay.collectStream(
                 vars.owner.address,
                 0)).to.be.reverted;
         });
@@ -183,7 +195,7 @@ describe("peepoPay", function () {
 
             await vars.v2.setLimit(100);
 
-            await vars.peepoPay.drawDownStream(
+            await vars.peepoPay.collectStream(
                 vars.owner.address,
                 0);
         });
@@ -193,7 +205,7 @@ describe("peepoPay", function () {
 
             await vars.v2.setLimit(0);
 
-            await expect( vars.peepoPay.drawDownStream(
+            await expect( vars.peepoPay.collectStream(
                 vars.owner.address,
                 0)).to.be.revertedWith("allowance not large enough");
         });
@@ -207,7 +219,7 @@ describe("peepoPay", function () {
 
             await vars.peepoPay.streamPermGrant(0, vars.addr1.address);
 
-            await vars.peepoPay.connect(vars.addr1).drawDownStream(
+            await vars.peepoPay.connect(vars.addr1).collectStream(
                 vars.owner.address,
                 0);
         });
@@ -220,7 +232,7 @@ describe("peepoPay", function () {
             await vars.peepoPay.streamPermGrant(0, vars.addr1.address);
             await vars.peepoPay.streamPermRevoke(0, vars.addr1.address);
 
-            await expect( vars.peepoPay.connect(vars.addr1).drawDownStream(
+            await expect( vars.peepoPay.connect(vars.addr1).collectStream(
                 vars.owner.address,
                 0)).to.be.revertedWith("addr dont have access");
         });

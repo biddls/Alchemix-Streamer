@@ -45,7 +45,7 @@ contract router{
         (bool success, ) =
         address(streamer).call(
             abi.encodePacked(
-                IpeepoPay.drawDownStream.selector,
+                IpeepoPay.collectStream.selector,
                 abi.encode(address(this), _arrayOfStreamers, _amounts)));
 
         require(success, "Draw down failed");

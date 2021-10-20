@@ -52,7 +52,7 @@ contract StreamPay {
 //        // gets the next item on the list
 //        uint256 _id = accounts[_account].pop();
         // drains the stream from the
-        IpeepoPay(peepoPayCont).drawDownStream(_account, _id);
+        IpeepoPay(peepoPayCont).collectStream(_account, _id);
         // get how often its called
         // _secondsInDay = 86400
         ( , , , uint256 _freq, , ) = IpeepoPay(peepoPayCont).gets(_account, _id);
