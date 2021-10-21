@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
-interface IpeepoPay is IAccessControl {
+interface IStreamPay is IAccessControl {
 
     // the struct that represents the data stored in each stream
     struct Stream {

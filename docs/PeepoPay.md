@@ -25,13 +25,15 @@ Collecting the stream has 2 main parts:
 
 <h3>Close Stream</h3>
 
-This deletes all data from the listing from the contract so meaning everything goes to 0; meaning no coins can be 
-emitted, and it would route to the 0 address by default
+This function is actually called edit stream but can be use to do 3 things:
+1. Deletes all data from the listing from the contract so meaning everything goes to 0; meaning no coins can be emitted, and it would route to the 0 address by default
+2. Edits the end date into somewhere in the past; it calls the collectStream function and then deletes the stream
+3. Edits the end stream date into the future
 
 <h2>Integrating PeepoPay into your contract in 3 simple steps:</h2>
 
-1. Download interface file from [here](./../contracts/interfaces/IpeepoPay.sol)
+1. Download interface file from [here](./../contracts/interfaces/IStreamPay.sol)
 2. Get the contract address from [here](./ContractAddresses.md)
 3. Begin making function calls to the contract and remeber the risk of re-enterancy with the custom contract routing
 
-To see a complete list of interface functions for PeepoPay see [here](.././contracts/interfaces/IpeepoPay.sol)
+To see a complete list of interface functions for PeepoPay see [here](.././contracts/interfaces/IStreamPay.sol)
