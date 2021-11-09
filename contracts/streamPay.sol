@@ -7,8 +7,9 @@ import {IStreamPay} from "./interfaces/IStreamPay.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IcustomRouter} from "./interfaces/IcustomRouter.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {SummedArrays} from "./SummedArrays.sol";
 
-/// @title PeepoPay
+/// @title StreamPay
 /// @author Biddls.eth
 /// @notice Allows users to set up streams with custom contract routing
 /// @dev the lower feature version that requires more upkeep
@@ -16,6 +17,13 @@ contract StreamPay is AccessControl{
 
     /// @dev mapping from => ID => stream
     mapping(address => mapping(uint256 => Stream)) public gets;
+
+    /// @dev mapping from => priority => reserved Stream
+    mapping(address => ResStream) public reserved;
+    /// @dev maximum search distance
+    uint8 public maxSteps;
+    /// @dev at what rate it goes up by (maxSteps ^ stepSize = max size of array)
+    uint8 public stepSize;
 
     /// @dev Struct that holds all the data about a stream
     struct Stream {
@@ -34,6 +42,16 @@ contract StreamPay is AccessControl{
         address[] route;
         /// @dev a role is generated which allows the owner to permission addresses to call collect the stream function
         bytes32 ROLE;
+        /// @dev denotes if this stream is a reserved stream or not
+        bool reserved;
+    }
+
+    /// @dev Struct that holds all the data about a reserved stream
+    struct ResStream {
+        /// @dev total above it summed: cps
+        SummedArrays summedCps;
+        /// @dev total above it summed: sinceLast
+        SummedArrays summedSinceLast;
     }
 
     /// @dev keeps track of the number of streams that an account has made (closing streams does not decrement this number)
@@ -49,16 +67,17 @@ contract StreamPay is AccessControl{
     address public coinAddress;
 
     /// @dev Sets up a basic admin role for upgrade-ability
-    constructor () {
+    constructor (uint8 _maxSteps, uint8 _stepSize) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        require(_maxSteps >= _stepSize);
+        maxSteps = _maxSteps;
+        stepSize = _stepSize;
     }
 
     /// @notice Admin only function to change the stored address of alc V2
     /// @dev Admin only cannot pass in 0 address
     /// @param _new The new address of alcV2
-    function changeAlcV2 (address _new) external {
-        // only admin address can call this (could be changed to the multisig or DAO)
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
+    function changeAlcV2(address _new) external adminOnly {
         // cant set it to 0 address
         require(_new != address(0));
         // sets new address
@@ -72,9 +91,7 @@ contract StreamPay is AccessControl{
     /// @notice Changes the address of the erc-20 token it gets from the vault
     /// @dev Admin only cannot pass in 0 address
     /// @param _new The new address of the alAsset coin
-    function setCoinAddress (address _new) external {
-        // only admin can call this (could be changed to the multisig or DAO)
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
+    function setCoinAddress(address _new) external adminOnly {
         // the 0 address isnt a contract
         require(_new != address(0));
         // sets the address of the erc-20 token
@@ -86,9 +103,7 @@ contract StreamPay is AccessControl{
     /// @notice Changes the address of the admin
     /// @dev Admin only cannot pass in 0 address
     /// @param _new The new address of admin
-    function changeAdmin (address _new) external {
-        // only admin can call this (could be changed to the multisig or DAO)
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
+    function changeAdmin(address _new) external adminOnly {
         // the 0 address isnt a contract
         require(_new != address(0));
         // sets the address of the admin
@@ -121,7 +136,7 @@ contract StreamPay is AccessControl{
         require(_cps > 0, "should not stream 0 coins");
         /// gets the next stream ID number
         uint256 _nextID = streams[msg.sender];
-        gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "");
+        gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "", false);
         gets[msg.sender][_nextID].ROLE = genRole(msg.sender, _nextID, gets[msg.sender][_nextID]);
         grantRole(gets[msg.sender][_nextID].ROLE, msg.sender);
         /// increments the number of streams from that address (starting from a 0)
@@ -166,9 +181,8 @@ contract StreamPay is AccessControl{
     function collectStream(
         address _payer,
         uint256 _ID
-    ) external returns (bool success){
+    ) external streamManagerOnly(_payer, _ID, gets[_payer][_ID]) returns (bool success){
         Stream memory _stream = gets[_payer][_ID];
-        require(hasRole(genRole(_payer, _ID, _stream), msg.sender), "addr dont have access");
         success = _collectStream(_payer, _ID, _stream);
     }
 
@@ -257,7 +271,7 @@ contract StreamPay is AccessControl{
         uint256 _ID,
         address _account
     ) view internal returns (bytes32){
-        require(msg.sender != _account, "no access allowed");
+        require(msg.sender != _account, "Stream owner must always have access");
         return genRole(msg.sender, _ID, gets[msg.sender][_ID]);
     }
 
@@ -267,6 +281,27 @@ contract StreamPay is AccessControl{
         Stream memory _stream
     ) pure internal returns (bytes32 _ROLE){
         return keccak256(abi.encodePacked(_from, _ID, _stream.payee, _stream.cps, _stream.freq, _stream.end));
+    }
+
+    function reserveStream() external {
+        address[2] memory tmp = [msg.sender, address(this)];
+        reserved[msg.sender] = ResStream(
+            new SummedArrays(maxSteps, stepSize, tmp),
+            new SummedArrays(maxSteps, stepSize, tmp));
+    }
+
+    modifier adminOnly {
+        // only admin address can call this (could be changed to the multisig or DAO)
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
+        _;
+    }
+
+    modifier streamManagerOnly (
+        address _payer,
+        uint256 _ID,
+        Stream memory _stream) {
+        require(hasRole(genRole(_payer, _ID, _stream), msg.sender), "addr dont have access");
+        _;
     }
 
     event streamStarted (

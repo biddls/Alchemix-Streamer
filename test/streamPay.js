@@ -241,7 +241,7 @@ describe("streamPay", function () {
                 vars.addr1.address, 1, 0, now(), now() + 1, []);
 
             await expect (vars.streamPay.connect(vars.addr1).streamPermGrant(
-                vars.addr1.address, 0)).to.be.revertedWith("no access allowed");
+                vars.addr1.address, 0)).to.be.revertedWith("Stream owner must always have access");
         });
     });
 });
