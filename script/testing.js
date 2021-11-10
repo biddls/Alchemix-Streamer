@@ -1,4 +1,5 @@
 const {BigNumber} = require("ethers");
+
 const testing = async function() {
     // setup
     let [owner, addr1, addr2, addr3, ...addrs] = await ethers.getSigners();
@@ -86,7 +87,31 @@ const testingGeneral = async function(decimals) {
         addrs: addrs};
 }
 
+const testingSumedArrs = async function(_maxSteps, _stepSize) {
+    let [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
+    const balance = await owner.getBalance();
+
+    let Token = await ethers.getContractFactory('BitOps')
+    const BitOps = await Token.deploy()
+
+    Token = await ethers.getContractFactory('SummedArrays', {
+        libraries: {
+            BitOps: BitOps.address,
+        },
+    });
+
+    const summedArs = await Token.deploy(_maxSteps, _stepSize, [owner.address, addr1.address]);
+
+    return {balance,
+        summedArs,
+        owner,
+        addr1,
+        addr2,
+        addrs};
+}
+
 module.exports = {
     testing,
-    testingGeneral
+    testingGeneral,
+    testingSumedArrs
 }

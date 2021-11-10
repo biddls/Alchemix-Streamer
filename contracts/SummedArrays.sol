@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 // I sense that there will be a billion 1 off errors
+import {BitOps} from "./utils/BitOps.sol";
 
 contract SummedArrays {
 
@@ -21,40 +22,43 @@ contract SummedArrays {
         admins = _admins;
     }
 
-    function read(uint16 _index) view adminsOnly maxSizeCheck(_index) returns (uint256 total){
+    function read(
+        uint16 _nubIndex
+    ) external view adminsOnly maxSizeCheck(_nubIndex)
+    returns (uint256 total){
         // converts to bit array
-        bytes2 _index = bytes2(_index);
+        bytes2 _index = bytes2(_nubIndex);
         // init vars
-        uint256 summedIndex;
+        uint16 summedIndex;
         total = 0;
         // counts from right to left as far as it can step (last index to 15-maxSteps)
         for(uint8 i = 15; i >= 15 - maxSteps; i--){
             // if there is a 1 there
-            if (_index[i] == 1){
+            if (BitOps.getBit(_index[i], i) == true){
                 // calculates where to next get data from
                 summedIndex += (15 - i)**2;
                 // gets data and adds it to total
-                total += data[summedIndex].sinceLast;
+                total += data[summedIndex];
             }
         }
     }
 
-    /*
-    using bit shifting you can then use an AND function on the data to get the next index
-    */
-
-    function write(uint16 _index, uint256 _posChange) external adminsOnly maxSizeCheck(_index) {
+    function write(
+        uint16 _nubIndex,
+        uint256 _posChange
+    ) external adminsOnly maxSizeCheck(_nubIndex) {
+        /*
+        using bit shifting you can then use an AND function on the data to get the next index
+        */
         // converts to bit array
-        bytes2 _index = bytes2(_index);
-        // for identifying the last 0 before the LSB
-        bool last0LSB;
+        bytes2 _index = bytes2(_nubIndex);
         for (uint8 i = 14; i >= 15 - maxSteps; i--){
-            if(_index[i-1] == 1 && _index[i] == 0){
-                data[_index] += _posChange;
-                _index[i-1] = 0;
-                _index[i] = 1;
+            if(BitOps.getBit(_index[i], i-1) == true && BitOps.getBit(_index[i], i) == false){
+                data[uint16(_index)] += _posChange;
+                BitOps.setBit(_index, i-1);
+                BitOps.clearBit(_index, i);
             } else {
-                _index[i-1] = 0;
+                BitOps.clearBit(_index, i-1);
             }
         }
     }
