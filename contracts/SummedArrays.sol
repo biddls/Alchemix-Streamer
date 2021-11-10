@@ -2,9 +2,8 @@
 
 pragma solidity ^0.8.0;
 
-// I sense that there will be a billion 1 off errors
 import {BitOps} from "./utils/BitOps.sol";
-import {console} from "hardhat/console.sol";
+//import {console} from "hardhat/console.sol";
 
 contract SummedArrays{
 
@@ -12,14 +11,11 @@ contract SummedArrays{
     mapping(uint16 => uint256) public data;
     /// @dev maximum search distance
     uint8 immutable public maxSteps;
-    /// @dev at what rate it goes up by (maxSteps ^ stepSize = max size of array)
-    uint8 immutable public stepSize;
     /// @dev array of addresses for the deploying contract and the owner of the stream
     address[2] public admins;
 
-    constructor(uint8 _maxSteps, uint8 _stepSize, address[2] memory _admins){
+    constructor(uint8 _maxSteps, address[2] memory _admins){
         maxSteps = _maxSteps;
-        stepSize = _stepSize;
         admins = _admins;
     }
 
@@ -30,51 +26,50 @@ contract SummedArrays{
         if(_nubIndex == 0){return data[0];}
         // converts to bit array
         bytes2 _index = bytes2(_nubIndex);
-        // init vars
-        uint16 summedIndex;
         total = 0;
         // counts from right to left as far as it can step (last index to 15-maxSteps)
         for(uint8 i = 0; i <= maxSteps; i++){
             // if there is a 1 there
             if (BitOps.getBit(_index, i) == true){
-                // calculates where to next get data from
-                summedIndex += i**2;
                 // gets data and adds it to total
-                total += data[summedIndex];
+                total += data[uint16(_index)];
+                _index = BitOps.clearBit(_index, i);
             }
         }
     }
 
     function write(
         uint16 _nubIndex,
-        uint256 _posChange
+        uint256 _posChange,
+        uint256 _negChange
     ) external adminsOnly maxSizeCheck(_nubIndex) {
         /*
         using bit shifting you can then use an AND function on the data to get the next index
         */
-        data[_nubIndex] += _posChange;
+        data[_nubIndex] = data[_nubIndex] + _posChange - _negChange;
         if(_nubIndex == 0){
             _nubIndex = 1;
-            data[_nubIndex] += _posChange;
+            data[_nubIndex] = data[_nubIndex] + _posChange - _negChange;
         }
         // converts to bit array
         bytes2 _index = bytes2(_nubIndex);
         for (uint8 i = 1; i <= maxSteps + 1; i++){
 
-            // testing //
+/* testing //
             logBytes(_index);
             console.log(BitOps.getBit(_index, i-1) == true, BitOps.getBit(_index, i) == false);
+*/
 
             if(BitOps.getBit(_index, i-1) == true && BitOps.getBit(_index, i) == false){
                 _index = BitOps.clearBit(_index, i-1);
                 _index = BitOps.setBit(_index, i);
-                data[uint16(_index)] += _posChange;
+                data[uint16(_index)] = data[uint16(_index)] + _posChange - _negChange;
             } else {
                 _index = BitOps.clearBit(_index, i-1);
             }
         }
     }
-
+/*
     function logBytes(bytes2 _data) public {
         string memory _temp = new string(16);
         for (uint8 i = 0; i < 16; i++){
@@ -94,7 +89,7 @@ contract SummedArrays{
         }
         return string(result);
     }
-
+*/
     modifier adminsOnly {
         require(admins[0] == msg.sender || admins[1] == msg.sender, "Admins only");
         _;

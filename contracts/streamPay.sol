@@ -18,12 +18,14 @@ contract StreamPay is AccessControl{
     /// @dev mapping from => ID => stream
     mapping(address => mapping(uint256 => Stream)) public gets;
 
-    /// @dev mapping from => priority => reserved Stream
+    /// @dev mapping from => Reserved stream
     mapping(address => ResStream) public reserved;
+
+    /// @dev mapping from => priority => reserved Stream
+    mapping(address => uint256) public reservedMaxSinceLast;
+
     /// @dev maximum search distance
     uint8 public maxSteps;
-    /// @dev at what rate it goes up by (maxSteps ^ stepSize = max size of array)
-    uint8 public stepSize;
 
     /// @dev Struct that holds all the data about a stream
     struct Stream {
@@ -71,7 +73,6 @@ contract StreamPay is AccessControl{
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         require(_maxSteps >= _stepSize);
         maxSteps = _maxSteps;
-        stepSize = _stepSize;
     }
 
     /// @notice Admin only function to change the stored address of alc V2
@@ -170,29 +171,28 @@ contract StreamPay is AccessControl{
         }
     }
 
-    // todo: add priority ordering AKA: "fucking kill me this is going to suck"
-    // unclaimed funds that are owed to each person are earmarked for
-    // the ID but a higher priority can dip into the buckets of lower IDs
-    // todo: allow priorities to be changed
-
     /// @notice Allows an approved address to collect a stream
     /// @param _payer the address that gives
-    /// @param _ID the ID of the stream
+    /// @param _id the ID of the stream
     function collectStream(
         address _payer,
-        uint256 _ID
-    ) external streamManagerOnly(_payer, _ID, gets[_payer][_ID]) returns (bool success){
-        Stream memory _stream = gets[_payer][_ID];
-        success = _collectStream(_payer, _ID, _stream);
+        uint256 _id
+    ) external returns (bool success){
+        Stream memory _stream = gets[_payer][_id];
+        require(hasRole(genRole(_payer, _id, _stream), msg.sender), "addr dont have access");
+        success = _collectStream(_payer, _id, _stream);
     }
 
     /// @dev internal function
+    /// @param _payer the address that gives
+    /// @param _id of the stream
     function _collectStream(
-        address _payer, // address that gives
-        uint256 _ID, // is of the stream
+        address _payer,
+        uint256 _id,
         Stream memory _stream
     ) internal returns (bool success){
-        uint256 _amount = streamSize(_payer, _ID);
+        uint256 _amount = streamSize(_payer, _id);
+        reservedStreamSinceLast(_id, _amount, _payer);
 
         // if it is not a custom contract
         // calls the borrow function in V2
@@ -203,7 +203,7 @@ contract StreamPay is AccessControl{
             _stream.route.length > 0 ? _stream.route[0] : _stream.payee
         );
 
-        gets[_payer][_ID].sinceLast += block.timestamp;
+        gets[_payer][_id].sinceLast += block.timestamp;
 
         if(_stream.route.length > 0){
             /*
@@ -230,12 +230,12 @@ contract StreamPay is AccessControl{
     /// @notice view function to tell it how much it will receive for a given address and ID of stream
     /// @dev only used for UI information
     /// @param _payer the address that gives
-    /// @param _ID of the stream
+    /// @param _id of the stream
     function streamSize(
         address _payer,
-        uint256 _ID
+        uint256 _id
     ) view public returns (uint256 _amount){
-        Stream memory _stream = gets[_payer][_ID];
+        Stream memory _stream = gets[_payer][_id];
         if((_stream.end >= block.timestamp) || (_stream.end == 0)){
             _amount = (_stream.freq + _stream.sinceLast) <= block.timestamp ?
             (block.timestamp - _stream.sinceLast) * _stream.cps : 0;
@@ -248,33 +248,39 @@ contract StreamPay is AccessControl{
     /// @notice allows the user to grant other addresses to call on his/her behalf by default the receiver and the payer have the roles
     /// @dev its done off of msg.sender so only the address paying out can change permissions
     /// @param _account it is granting
-    /// @param _ID the ID of the stream
+    /// @param _id the ID of the stream
     function streamPermGrant(
         address _account,
-        uint256 _ID
+        uint256 _id
     ) external {
-        grantRole(streamRoleChngChecks(_ID, _account), _account);
+        grantRole(streamRoleChngChecks(_id, _account), _account);
     }
 
     /// @notice allows the user to grant other addresses to call on his/her behalf by default the receiver and the payer have the roles
     /// @dev its done off of msg.sender so only the address paying out can change permissions
     /// @param _account it is granting
-    /// @param _ID the ID of the stream
+    /// @param _id the ID of the stream
     function streamPermRevoke(
         address _account,
-        uint256 _ID
+        uint256 _id
     ) external {
-        revokeRole(streamRoleChngChecks(_ID, _account), _account);
+        revokeRole(streamRoleChngChecks(_id, _account), _account);
     }
 
+    /// @notice makes the relevant checks before generating the role
+    /// @param _account it is granting
+    /// @param _id the ID of the stream
     function streamRoleChngChecks(
-        uint256 _ID,
+        uint256 _id,
         address _account
     ) view internal returns (bytes32){
         require(msg.sender != _account, "Stream owner must always have access");
-        return genRole(msg.sender, _ID, gets[msg.sender][_ID]);
+        return genRole(msg.sender, _id, gets[msg.sender][_id]);
     }
 
+    /// @notice generates the role required for the account and subsequent stream
+    /// @param _account it is granting
+    /// @param _id the ID of the stream
     function genRole(
         address _from,
         uint256 _ID,
@@ -283,24 +289,36 @@ contract StreamPay is AccessControl{
         return keccak256(abi.encodePacked(_from, _ID, _stream.payee, _stream.cps, _stream.freq, _stream.end));
     }
 
-    function reserveStream() external {
+    function reserveStream(
+        uint256 _id
+    ) external {
         address[2] memory tmp = [msg.sender, address(this)];
         reserved[msg.sender] = ResStream(
-            new SummedArrays(maxSteps, stepSize, tmp),
-            new SummedArrays(maxSteps, stepSize, tmp));
+            new SummedArrays(maxSteps, tmp),
+            new SummedArrays(maxSteps, tmp));
+        gets[msg.sender][_id].reserved = true;
+    }
+
+    function reservedStreamSinceLast(
+        uint256 _streamID,
+        uint256 _asking,
+        address _payer
+    ) internal {
+        require(IalcV2Vault(adrAlcV2).allowance[_payer] - calcEarMarked(msg.sender) >= _asking);
+    }
+
+    function calcEarMarked(
+        address _account,
+        uint16 _index
+    ) public view returns (uint256){
+        return ((_index * reservedMaxSinceLast[_account])
+        - reserved[_account].summedSinceLast.read(_index))
+        * reserved[_account].summedCps.read(_index);
     }
 
     modifier adminOnly {
         // only admin address can call this (could be changed to the multisig or DAO)
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
-        _;
-    }
-
-    modifier streamManagerOnly (
-        address _payer,
-        uint256 _ID,
-        Stream memory _stream) {
-        require(hasRole(genRole(_payer, _ID, _stream), msg.sender), "addr dont have access");
         _;
     }
 

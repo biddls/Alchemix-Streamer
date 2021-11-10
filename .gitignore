@@ -6,3 +6,5 @@ coverage/
 coverage.json
 yarn.lock
 plan.png
+/contracts/interfaces/IAlchemistV2.sol
+/contracts/interfaces/alchemist/

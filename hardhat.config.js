@@ -1,7 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
 require('solidity-coverage')
 require("hardhat-gas-reporter");
-require('hardhat-spdx-license-identifier');
+// require('hardhat-spdx-license-identifier');
 require("hardhat-interface-generator");
 
 module.exports = {
@@ -12,7 +12,7 @@ module.exports = {
     }
   },
   solidity: {
-    version: "0.8.7",
+    version: "0.8.9",
     settings: {
       optimizer: {
         enabled: true,

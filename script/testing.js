@@ -6,8 +6,15 @@ const testing = async function() {
     const balance = await owner.getBalance();
 
     // testing stuff
+    let contract = await ethers.getContractFactory('BitOps')
+    const BitOps = await contract.deploy()
+
     // streamer
-    let contract = await ethers.getContractFactory("StreamPay");
+    contract = await ethers.getContractFactory("StreamPay", {
+        libraries: {
+            BitOps: BitOps.address,
+        },
+    });
     const streamPay = await contract.deploy(5, 2);
 
     // streamer.changeAlcV2(addr1.address);
@@ -87,7 +94,7 @@ const testingGeneral = async function(decimals) {
         addrs: addrs};
 }
 
-const testingSumedArrs = async function(_maxSteps, _stepSize) {
+const testingSumedArrs = async function(_maxSteps) {
     let [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
     const balance = await owner.getBalance();
 
@@ -100,7 +107,7 @@ const testingSumedArrs = async function(_maxSteps, _stepSize) {
         },
     });
 
-    const summedArs = await Token.deploy(_maxSteps, _stepSize, [owner.address, addr1.address]);
+    const summedArs = await Token.deploy(_maxSteps, [owner.address, addr1.address]);
 
     return {balance,
         summedArs,
