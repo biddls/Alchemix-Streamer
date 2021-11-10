@@ -15,4 +15,11 @@ interface IalcV2Vault {
         uint256 amount,
         address recipient
     ) external;
+
+    // returns the max allowance allowed to be borrowed from the fake V2 contract
+    function allowance(
+        address
+    ) external
+    view returns ( uint256 );
+
 }

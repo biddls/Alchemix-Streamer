@@ -42,13 +42,13 @@ describe("Summed Arrays testing", function () {
                 )
             }
             */
-
-            for (let i=0;i < 50; i++){
+            const max = 2**(await vars.summedArs.maxSteps() + 1)
+            for (let i=0;i < max; i++){
                 await vars.summedArs.write(i, i, 0)
                 expect(await vars.summedArs.read(i)).to.equal(i*(i+1)/2)
             }
 
-            for (let i=0;i < 50; i++){
+            for (let i=0;i < max; i++){
                 await vars.summedArs.write(i, 0, i)
                 expect(await vars.summedArs.read(i)).to.equal(0)
             }

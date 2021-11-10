@@ -68,6 +68,7 @@ contract SummedArrays{
                 _index = BitOps.clearBit(_index, i-1);
             }
         }
+        data[uint16(2**(maxSteps + 1))] = data[uint16(2**(maxSteps + 1))] + _posChange - _negChange;
     }
 /*
     function logBytes(bytes2 _data) public {

@@ -45,7 +45,7 @@ contract StreamPay is AccessControl{
         /// @dev a role is generated which allows the owner to permission addresses to call collect the stream function
         bytes32 ROLE;
         /// @dev denotes if this stream is a reserved stream or not
-        bool reserved;
+        uint16 reserved;
     }
 
     /// @dev Struct that holds all the data about a reserved stream
@@ -54,6 +54,8 @@ contract StreamPay is AccessControl{
         SummedArrays summedCps;
         /// @dev total above it summed: sinceLast
         SummedArrays summedSinceLast;
+        /// @dev tells the contract if the mapping is empty
+        bool alive;
     }
 
     /// @dev keeps track of the number of streams that an account has made (closing streams does not decrement this number)
@@ -137,7 +139,7 @@ contract StreamPay is AccessControl{
         require(_cps > 0, "should not stream 0 coins");
         /// gets the next stream ID number
         uint256 _nextID = streams[msg.sender];
-        gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "", false);
+        gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "", uint16(2**(maxSteps + 1)));
         gets[msg.sender][_nextID].ROLE = genRole(msg.sender, _nextID, gets[msg.sender][_nextID]);
         grantRole(gets[msg.sender][_nextID].ROLE, msg.sender);
         /// increments the number of streams from that address (starting from a 0)
@@ -160,7 +162,7 @@ contract StreamPay is AccessControl{
             gets[msg.sender][_id].end = _end;
             // empties the stream and then deletes it if its already closed
             if(_end < block.timestamp){
-                _collectStream(msg.sender, _id, gets[msg.sender][_id]);
+                _collectStream(msg.sender, _id, gets[msg.sender][_id], streamSize(msg.sender, _id));
                 delete gets[msg.sender][_id];
                 emit streamClosed(msg.sender, _id);
             }
@@ -180,7 +182,7 @@ contract StreamPay is AccessControl{
     ) external returns (bool success){
         Stream memory _stream = gets[_payer][_id];
         require(hasRole(genRole(_payer, _id, _stream), msg.sender), "addr dont have access");
-        success = _collectStream(_payer, _id, _stream);
+        success = _collectStream(_payer, _id, _stream, streamSize(_payer, _id));
     }
 
     /// @dev internal function
@@ -189,10 +191,9 @@ contract StreamPay is AccessControl{
     function _collectStream(
         address _payer,
         uint256 _id,
-        Stream memory _stream
-    ) internal returns (bool success){
-        uint256 _amount = streamSize(_payer, _id);
-        reservedStreamSinceLast(_id, _amount, _payer);
+        Stream memory _stream,
+        uint256 _amount
+    ) internal reservedStreamSinceLast(_id, _amount, _payer) returns (bool success){
 
         // if it is not a custom contract
         // calls the borrow function in V2
@@ -268,43 +269,54 @@ contract StreamPay is AccessControl{
     }
 
     /// @notice makes the relevant checks before generating the role
-    /// @param _account it is granting
+    /// @param _from it is granting
     /// @param _id the ID of the stream
     function streamRoleChngChecks(
         uint256 _id,
-        address _account
+        address _from
     ) view internal returns (bytes32){
-        require(msg.sender != _account, "Stream owner must always have access");
+        require(msg.sender != _from, "Stream owner must always have access");
         return genRole(msg.sender, _id, gets[msg.sender][_id]);
     }
 
     /// @notice generates the role required for the account and subsequent stream
-    /// @param _account it is granting
+    /// @param _from it is granting
     /// @param _id the ID of the stream
     function genRole(
         address _from,
-        uint256 _ID,
+        uint256 _id,
         Stream memory _stream
     ) pure internal returns (bytes32 _ROLE){
-        return keccak256(abi.encodePacked(_from, _ID, _stream.payee, _stream.cps, _stream.freq, _stream.end));
+        return keccak256(abi.encodePacked(_from, _id, _stream.payee, _stream.cps, _stream.freq, _stream.end));
     }
 
+/*
     function reserveStream(
         uint256 _id
     ) external {
         address[2] memory tmp = [msg.sender, address(this)];
         reserved[msg.sender] = ResStream(
             new SummedArrays(maxSteps, tmp),
-            new SummedArrays(maxSteps, tmp));
+            new SummedArrays(maxSteps, tmp),
+            true);
         gets[msg.sender][_id].reserved = true;
     }
+*/
 
-    function reservedStreamSinceLast(
-        uint256 _streamID,
+    modifier reservedStreamSinceLast(
+        uint256 _id,
         uint256 _asking,
         address _payer
-    ) internal {
-        require(IalcV2Vault(adrAlcV2).allowance[_payer] - calcEarMarked(msg.sender) >= _asking);
+    ) {
+        if(reserved[_payer].alive) {
+            require(
+                IalcV2Vault(adrAlcV2).allowance(_payer) -
+                calcEarMarked(msg.sender, gets[_payer][_id].reserved)
+                >= _asking);
+            _;
+        } else {
+            _;
+        }
     }
 
     function calcEarMarked(

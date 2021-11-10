@@ -10,11 +10,7 @@ const testing = async function() {
     const BitOps = await contract.deploy()
 
     // streamer
-    contract = await ethers.getContractFactory("StreamPay", {
-        libraries: {
-            BitOps: BitOps.address,
-        },
-    });
+    contract = await ethers.getContractFactory("StreamPay");
     const streamPay = await contract.deploy(5, 2);
 
     // streamer.changeAlcV2(addr1.address);
