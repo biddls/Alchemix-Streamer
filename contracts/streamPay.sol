@@ -162,7 +162,7 @@ contract StreamPay is AccessControl{
             gets[msg.sender][_id].end = _end;
             // empties the stream and then deletes it if its already closed
             if(_end < block.timestamp){
-                _collectStream(msg.sender, _id, gets[msg.sender][_id], streamSize(msg.sender, _id));
+                _collectStream(msg.sender, _id, gets[msg.sender][_id]);
                 delete gets[msg.sender][_id];
                 emit streamClosed(msg.sender, _id);
             }
@@ -182,7 +182,7 @@ contract StreamPay is AccessControl{
     ) external returns (bool success){
         Stream memory _stream = gets[_payer][_id];
         require(hasRole(genRole(_payer, _id, _stream), msg.sender), "addr dont have access");
-        success = _collectStream(_payer, _id, _stream, streamSize(_payer, _id));
+        success = _collectStream(_payer, _id, _stream);
     }
 
     /// @dev internal function
@@ -191,13 +191,21 @@ contract StreamPay is AccessControl{
     function _collectStream(
         address _payer,
         uint256 _id,
-        Stream memory _stream,
-        uint256 _amount
-    ) internal reservedStreamSinceLast(_id, _amount, _payer) returns (bool success){
+        Stream memory _stream
+    ) internal returns (bool success){
+        uint256 _amount = streamSize(_payer, _id);
+        // reserved streams management
+        // checks if it can be afforded
+        if(reserved[_payer].alive) {
+            _amount = calcEarMarked(_payer, _stream.reserved, _amount, false);
+            reservedMaxSinceLast[_payer] = block.timestamp;
+        } else {
+            _amount = calcEarMarked(_payer, 0, _amount, true);
+        }
 
         // if it is not a custom contract
         // calls the borrow function in V2
-        IalcV2Vault(adrAlcV2).mintFrom(
+        IalcV2Vault(adrAlcV2).mintFrom( // <- TODO integration with V2
             _payer,
             _amount,
         // this either sends the funds to the 1st custom cont or payee depending on if there is a route or not
@@ -208,14 +216,15 @@ contract StreamPay is AccessControl{
 
         if(_stream.route.length > 0){
             /*
-            // if it is a custom contract
+            if it is a custom contract
             this allows for people to route funds though custom contracts
             like if you want to swap it to something or deposit into another protocol or anything
-            // no risk of reentrancy as nothing else in the contract after this relies on the contracts own internal data
+            mby no risk of reentrancy as nothing else in the
+            contract after this relies on the contracts own internal state
+            ##############################
+            ###RISK OF REENTRANCY HERE###
+            ##############################
             */
-            //##############################
-            //###RISK OF REENTERANCY HERE###
-            //##############################
             IcustomRouter(_stream.route[0]).route(
                 coinAddress,
                 _stream.payee,
@@ -303,29 +312,23 @@ contract StreamPay is AccessControl{
     }
 */
 
-    modifier reservedStreamSinceLast(
-        uint256 _id,
-        uint256 _asking,
-        address _payer
-    ) {
-        if(reserved[_payer].alive) {
-            require(
-                IalcV2Vault(adrAlcV2).allowance(_payer) -
-                calcEarMarked(msg.sender, gets[_payer][_id].reserved)
-                >= _asking);
-            _;
-        } else {
-            _;
-        }
-    }
-
+    /// @notice gets how much is already reserved and says if an ammount is possible or not
     function calcEarMarked(
-        address _account,
-        uint16 _index
-    ) public view returns (uint256){
-        return ((_index * reservedMaxSinceLast[_account])
-        - reserved[_account].summedSinceLast.read(_index))
-        * reserved[_account].summedCps.read(_index);
+        address _payer,
+        uint16 _index, /*how many streams*/
+        uint256 _asking,
+        bool _max
+    ) public view returns (uint256 _canBorrow){
+        uint256 _summedCps = _max ? reserved[_payer].summedCps.max() : reserved[_payer].summedCps.read(_index);
+        uint256 _summedSinceLast = _max ? reserved[_payer].summedSinceLast.max() : reserved[_payer].summedSinceLast.read(_index); /*Sum of all streams*/
+        uint256 _accurateDiv = (_summedCps % _index) + (_summedCps / _index) /*division without loosing accuracy to get an average CPS for all the streams involved*/;
+
+        _canBorrow = IalcV2Vault(adrAlcV2).allowance(_payer) - // total to borrow
+        ((_index *
+        reservedMaxSinceLast[_payer]/*most recent unix time of draw down*/)
+        - _summedSinceLast
+        * _accurateDiv)
+        - _asking; // whats left
     }
 
     modifier adminOnly {

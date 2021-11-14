@@ -21,9 +21,13 @@ contract SummedArrays{
 
     function read(
         uint16 _nubIndex
-    ) external view adminsOnly maxSizeCheck(_nubIndex)
+    ) external view adminsOnly maxSizeCheck(_nubIndex, false)
     returns (uint256 total){
-        if(_nubIndex == 0){return data[0];}
+        if(_nubIndex == 0){
+            return data[0];
+        } else if(_nubIndex == 2**(1 +maxSteps)) {
+            return data[uint16(2**(1 +maxSteps))];
+        }
         // converts to bit array
         bytes2 _index = bytes2(_nubIndex);
         total = 0;
@@ -42,7 +46,7 @@ contract SummedArrays{
         uint16 _nubIndex,
         uint256 _posChange,
         uint256 _negChange
-    ) external adminsOnly maxSizeCheck(_nubIndex) {
+    ) external adminsOnly maxSizeCheck(_nubIndex, true) {
         /*
         using bit shifting you can then use an AND function on the data to get the next index
         */
@@ -91,13 +95,22 @@ contract SummedArrays{
         return string(result);
     }
 */
+
+    function max() external view returns (uint256){
+        return read(2**(1 +maxSteps));
+    }
+
     modifier adminsOnly {
         require(admins[0] == msg.sender || admins[1] == msg.sender, "Admins only");
         _;
     }
 
-    modifier maxSizeCheck(uint16 _numb) {
-        require(_numb < 2**(1 +maxSteps), "Numb to big");
+    modifier maxSizeCheck(uint16 _numb, bool _write) {
+        if(_write){
+            require(_numb < 2**(1 +maxSteps), "Numb to big");
+        } else {
+            require(_numb <= 2**(1 +maxSteps), "Numb to big");
+        }
         _;
     }
 }
