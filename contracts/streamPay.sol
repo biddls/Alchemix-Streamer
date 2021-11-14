@@ -159,18 +159,38 @@ contract StreamPay is AccessControl{
         uint256 _end
     ) external {
         if(!_emergencyClose){
+            uint256 _oldEnd = gets[msg.sender][_id].end;
             gets[msg.sender][_id].end = _end;
             // empties the stream and then deletes it if its already closed
             if(_end < block.timestamp){
                 _collectStream(msg.sender, _id, gets[msg.sender][_id]);
+                // cleans up reserved streams if it exists
+                clearReservedStream(msg.sender, gets[msg.sender][_id].reserved);
                 delete gets[msg.sender][_id];
                 emit streamClosed(msg.sender, _id);
+                return;
+            }
+            if(reserved[msg.sender].alive){
+                if(_oldEnd < _end){reserved[msg.sender].summedSinceLast.write(gets[msg.sender][_id].reserved, 0, _end - _oldEnd);}
+                else if(_oldEnd > _end){reserved[msg.sender].summedSinceLast.write(gets[msg.sender][_id].reserved, _oldEnd - _end, 0);}
+                else {reserved[msg.sender].summedSinceLast.write(gets[msg.sender][_id].reserved, 0, _oldEnd);}
             }
         } else {
+            // cleans up reserved streams if it exists
+            clearReservedStream(msg.sender, gets[msg.sender][_id].reserved);
             // deletes it without the opportunity for the receiver to claim what ever they owe
             delete gets[msg.sender][_id];
             emit streamClosed(msg.sender, _id);
         }
+    }
+
+    function clearReservedStream (
+        address _account,
+        uint16 _index
+    ) internal {
+        if(!reserved[_account].alive){return;}
+        reserved[_account].summedSinceLast.clear(_index);
+        reserved[_account].summedCps.clear(_index);
     }
 
     /// @notice Allows an approved address to collect a stream
@@ -195,12 +215,15 @@ contract StreamPay is AccessControl{
     ) internal returns (bool success){
         uint256 _amount = streamSize(_payer, _id);
         // reserved streams management
-        // checks if it can be afforded
+        // sets how much can be drawn down
         if(reserved[_payer].alive) {
             _amount = calcEarMarked(_payer, _stream.reserved, _amount, false);
             reservedMaxSinceLast[_payer] = block.timestamp;
+            // updates values held in the SummedArrays
+            reserved[_payer].summedSinceLast.write(_stream.reserved, _amount, 0);
         } else {
             _amount = calcEarMarked(_payer, 0, _amount, true);
+            // updates values held in the SummedArrays
         }
 
         // if it is not a custom contract
@@ -312,7 +335,7 @@ contract StreamPay is AccessControl{
     }
 */
 
-    /// @notice gets how much is already reserved and says if an ammount is possible or not
+    /// @notice gets how much is already reserved and says if an amount is possible or not
     function calcEarMarked(
         address _payer,
         uint16 _index, /*how many streams*/

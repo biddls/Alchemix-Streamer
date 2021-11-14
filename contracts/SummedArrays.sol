@@ -22,6 +22,13 @@ contract SummedArrays{
     function read(
         uint16 _nubIndex
     ) external view adminsOnly maxSizeCheck(_nubIndex, false)
+    returns (uint256) {
+        return _read(_nubIndex);
+    }
+
+    function _read(
+        uint16 _nubIndex
+    ) internal view adminsOnly
     returns (uint256 total){
         if(_nubIndex == 0){
             return data[0];
@@ -47,6 +54,14 @@ contract SummedArrays{
         uint256 _posChange,
         uint256 _negChange
     ) external adminsOnly maxSizeCheck(_nubIndex, true) {
+        _write(_nubIndex, _posChange, _negChange);
+    }
+
+    function _write(
+        uint16 _nubIndex,
+        uint256 _posChange,
+        uint256 _negChange
+    ) internal adminsOnly {
         /*
         using bit shifting you can then use an AND function on the data to get the next index
         */
@@ -74,6 +89,7 @@ contract SummedArrays{
         }
         data[uint16(2**(maxSteps + 1))] = data[uint16(2**(maxSteps + 1))] + _posChange - _negChange;
     }
+
 /*
     function logBytes(bytes2 _data) public {
         string memory _temp = new string(16);
@@ -96,8 +112,15 @@ contract SummedArrays{
     }
 */
 
-    function max() external view returns (uint256){
-        return read(2**(1 +maxSteps));
+    function max(
+    ) external view returns (uint256){
+        return _read(uint16(2**(1 + maxSteps)));
+    }
+
+    function clear(
+        uint16 _nubIndex
+    ) external adminsOnly maxSizeCheck(_nubIndex, true) {
+        _write(_nubIndex, 0, _read(_nubIndex));
     }
 
     modifier adminsOnly {
@@ -105,8 +128,8 @@ contract SummedArrays{
         _;
     }
 
-    modifier maxSizeCheck(uint16 _numb, bool _write) {
-        if(_write){
+    modifier maxSizeCheck(uint16 _numb, bool _writing) {
+        if(_writing){
             require(_numb < 2**(1 +maxSteps), "Numb to big");
         } else {
             require(_numb <= 2**(1 +maxSteps), "Numb to big");

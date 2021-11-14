@@ -55,5 +55,22 @@ describe("Summed Arrays testing", function () {
             }
             expect(await vars.summedArs.read(max)).to.equal(0)
         });
+        it("gigga", async function () {
+            for(let x = 1;x < 10; x++){
+                vars = await testingSumedArrs(x);
+                let max = 2 ** (await vars.summedArs.maxSteps() + 1)
+                for (let i = 0; i < max; i++) {
+                    await vars.summedArs.write(i, i, 0)
+                    expect(await vars.summedArs.read(i)).to.equal(i * (i + 1) / 2)
+                }
+                expect(await vars.summedArs.read(max)).to.equal(max * (max + 1) / 2)
+
+                for (let i = 0; i < max; i++) {
+                    await vars.summedArs.write(i, 0, i)
+                    expect(await vars.summedArs.read(i)).to.equal(0)
+                }
+                expect(await vars.summedArs.read(max)).to.equal(0)
+            }
+        });
     });
 });
