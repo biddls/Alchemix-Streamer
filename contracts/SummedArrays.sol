@@ -13,10 +13,13 @@ contract SummedArrays{
     uint8 immutable public maxSteps;
     /// @dev array of addresses for the deploying contract and the owner of the stream
     address[2] public admins;
+    /// @dev
+    uint16[] public next;
 
     constructor(uint8 _maxSteps, address[2] memory _admins){
         maxSteps = _maxSteps;
         admins = _admins;
+        next.push(0);
     }
 
     function read(
@@ -57,11 +60,22 @@ contract SummedArrays{
         _write(_nubIndex, _posChange, _negChange);
     }
 
+    function newData(
+        uint256 _value
+    ) external adminsOnly {
+        uint16 _index = _pop(next);
+        _maxSizeCheck(_index, true);
+        _write(_index, _value, 0);
+        if(next.length == 0){
+            next.push(_index + 1);
+        }
+    }
+
     function _write(
         uint16 _nubIndex,
         uint256 _posChange,
         uint256 _negChange
-    ) internal adminsOnly {
+    ) internal adminsOnly returns (bool){
         /*
         using bit shifting you can then use an AND function on the data to get the next index
         */
@@ -88,6 +102,8 @@ contract SummedArrays{
             }
         }
         data[uint16(2**(maxSteps + 1))] = data[uint16(2**(maxSteps + 1))] + _posChange - _negChange;
+        if(data[uint16(2**(maxSteps + 1))] == 0){return true;}
+        return false;
     }
 
 /*
@@ -119,8 +135,10 @@ contract SummedArrays{
 
     function clear(
         uint16 _nubIndex
-    ) external adminsOnly maxSizeCheck(_nubIndex, true) {
+    ) external adminsOnly maxSizeCheck(_nubIndex, true) returns (bool){
         _write(_nubIndex, 0, _read(_nubIndex));
+        next.push(_nubIndex);
+        return true;
     }
 
     modifier adminsOnly {
@@ -128,12 +146,35 @@ contract SummedArrays{
         _;
     }
 
+    function _maxSizeCheck(
+        uint16 _numb,
+        bool _writing
+    ) maxSizeCheck(_numb, _writing) internal {}
+
+    function _pop(uint16[] storage _array) internal returns (uint16 _item){
+        _item = _array[_array.length-1];
+        _array.pop();
+        return _item;
+    }
+
+    function swap(uint16 index1, uint16 index2) external {
+        uint256 numb1 = _read(index1);
+        uint256 numb2 = _read(index2);
+        _write(index1, numb2, numb1);
+        _write(index2, numb1, numb2);
+    }
+
     modifier maxSizeCheck(uint16 _numb, bool _writing) {
         if(_writing){
-            require(_numb < 2**(1 +maxSteps), "Numb to big");
+            require(_numb < 2**(1 + maxSteps), "Numb to big");
         } else {
-            require(_numb <= 2**(1 +maxSteps), "Numb to big");
+            require(_numb <= 2**(1 + maxSteps), "Numb to big");
         }
         _;
+    }
+
+    function selfDes(
+    ) adminsOnly public {
+        selfdestruct(payable(address(admins[0])));
     }
 }

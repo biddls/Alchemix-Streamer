@@ -21,11 +21,15 @@ contract StreamPay is AccessControl{
     /// @dev mapping from => Reserved stream
     mapping(address => ResStream) public reserved;
 
-    /// @dev mapping from => priority => reserved Stream
+    /// @dev mapping account => since last draw down from all streams
     mapping(address => uint256) public reservedMaxSinceLast;
+
+    /// @dev mapping account => total CPS for each payer
+    mapping(address => uint256) public totalCPS;
 
     /// @dev maximum search distance
     uint8 public maxSteps;
+    uint16 public maxIndex = uint16(2**(maxSteps + 1));
 
     /// @dev Struct that holds all the data about a stream
     struct Stream {
@@ -45,7 +49,9 @@ contract StreamPay is AccessControl{
         /// @dev a role is generated which allows the owner to permission addresses to call collect the stream function
         bytes32 ROLE;
         /// @dev denotes if this stream is a reserved stream or not
-        uint16 reserved;
+        uint16 reserveIndex;
+        /// @dev total pay out for a stream set to 0 if end is 0
+        uint256 totalPayOut;
     }
 
     /// @dev Struct that holds all the data about a reserved stream
@@ -137,9 +143,12 @@ contract StreamPay is AccessControl{
         require(_to != address(0), "cannot stream to 0 address");
         /// cant send 0 coins
         require(_cps > 0, "should not stream 0 coins");
+        /// cant end before _start
+        require(_end > _start, "Cant end before you have started");
         /// gets the next stream ID number
         uint256 _nextID = streams[msg.sender];
-        gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "", uint16(2**(maxSteps + 1)));
+        gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "", maxIndex, updateTotalPayOut(_start, _end, _cps));
+        totalCPS[msg.sender] += _cps;
         gets[msg.sender][_nextID].ROLE = genRole(msg.sender, _nextID, gets[msg.sender][_nextID]);
         grantRole(gets[msg.sender][_nextID].ROLE, msg.sender);
         /// increments the number of streams from that address (starting from a 0)
@@ -148,7 +157,7 @@ contract StreamPay is AccessControl{
         emit streamStarted(msg.sender, _nextID, _to);
     }
 
-    /// @notice Allows the user to edit a stream
+    /// @notice Allows the user to edit a streams end date
     /// @dev This works from msg.sender so you cant do this on behalf of another address with out building something externaly
     /// @param _id the ID of the stream
     /// @param _emergencyClose A bool that either allows for back pay or does not
@@ -158,6 +167,14 @@ contract StreamPay is AccessControl{
         bool _emergencyClose,
         uint256 _end
     ) external {
+        _editStream(_id, _emergencyClose, _end);
+    }
+
+    function _editStream(
+        uint256 _id, // the ID of the stream
+        bool _emergencyClose,
+        uint256 _end
+    ) internal {
         if(!_emergencyClose){
             uint256 _oldEnd = gets[msg.sender][_id].end;
             gets[msg.sender][_id].end = _end;
@@ -165,22 +182,53 @@ contract StreamPay is AccessControl{
             if(_end < block.timestamp){
                 _collectStream(msg.sender, _id, gets[msg.sender][_id]);
                 // cleans up reserved streams if it exists
-                clearReservedStream(msg.sender, gets[msg.sender][_id].reserved);
+                clearReservedStream(msg.sender, gets[msg.sender][_id].reserveIndex);
+                totalCPS[msg.sender] -= gets[msg.sender][_id].cps;
                 delete gets[msg.sender][_id];
                 emit streamClosed(msg.sender, _id);
                 return;
             }
+            gets[msg.sender][_id].totalPayOut = updateTotalPayOut(gets[msg.sender][_id].sinceLast, gets[msg.sender][_id].end, gets[msg.sender][_id].cps);
             if(reserved[msg.sender].alive){
-                if(_oldEnd < _end){reserved[msg.sender].summedSinceLast.write(gets[msg.sender][_id].reserved, 0, _end - _oldEnd);}
-                else if(_oldEnd > _end){reserved[msg.sender].summedSinceLast.write(gets[msg.sender][_id].reserved, _oldEnd - _end, 0);}
-                else {reserved[msg.sender].summedSinceLast.write(gets[msg.sender][_id].reserved, 0, _oldEnd);}
+                // if its properly closed
+                if(_oldEnd < _end){reserved[msg.sender].summedSinceLast.write(gets[msg.sender][_id].reserveIndex, 0, _end - _oldEnd);}
+                // if its in the future
+                else if(_oldEnd > _end){reserved[msg.sender].summedSinceLast.write(gets[msg.sender][_id].reserveIndex, _oldEnd - _end, 0);}
+                // if its closed on the dot then it just sets it to 0
+                else {reserved[msg.sender].summedSinceLast.write(gets[msg.sender][_id].reserveIndex, 0, _oldEnd);}
             }
         } else {
             // cleans up reserved streams if it exists
-            clearReservedStream(msg.sender, gets[msg.sender][_id].reserved);
+            clearReservedStream(msg.sender, gets[msg.sender][_id].reserveIndex);
+            totalCPS[msg.sender] -= gets[msg.sender][_id].cps;
             // deletes it without the opportunity for the receiver to claim what ever they owe
             delete gets[msg.sender][_id];
             emit streamClosed(msg.sender, _id);
+        }
+    }
+
+    /// @notice Allows the user to edit a streams CPS
+    /// @dev This works from msg.sender so you cant do this on behalf of another address with out building something externaly
+    /// @param _id the ID of the stream
+    /// @param _cps if back pay is allowed, until when?
+    function editStreamCps(
+        uint256 _id, // the ID of the stream
+        uint256 _cps
+    ) external {
+        require(_cps != 0);
+        uint256 _oldCps = gets[msg.sender][_id].cps;
+        require(_oldCps != _cps);
+        _oldCps > _cps ? totalCPS[msg.sender] -= _oldCps - _cps : totalCPS[msg.sender] += _oldCps - _cps ;
+        gets[msg.sender][_id].cps = _cps;
+        gets[msg.sender][_id].totalPayOut = updateTotalPayOut(gets[msg.sender][_id].sinceLast, gets[msg.sender][_id].end, _cps);
+        // empties the stream and then deletes it if its already closed
+        if(reserved[msg.sender].alive){
+            // if its properly closed
+            if(_oldCps < _cps){reserved[msg.sender].summedCps.write(gets[msg.sender][_id].reserveIndex, 0, _cps - _oldCps);}
+            // if its in the future
+            else if(_oldCps > _cps){reserved[msg.sender].summedCps.write(gets[msg.sender][_id].reserveIndex, _oldCps - _cps, 0);}
+            // if its closed on the dot then it just sets it to 0
+            else {reserved[msg.sender].summedCps.write(gets[msg.sender][_id].reserveIndex, 0, _oldCps);}
         }
     }
 
@@ -188,9 +236,11 @@ contract StreamPay is AccessControl{
         address _account,
         uint16 _index
     ) internal {
-        if(!reserved[_account].alive){return;}
-        reserved[_account].summedSinceLast.clear(_index);
-        reserved[_account].summedCps.clear(_index);
+        if(!_hasReservation(_account)){return;}
+        // if its all empty then it deletes its
+        if(reserved[_account].summedSinceLast.clear(_index) && reserved[_account].summedCps.clear(_index)){
+            reserved[_account].alive = false;
+        }
     }
 
     /// @notice Allows an approved address to collect a stream
@@ -217,15 +267,14 @@ contract StreamPay is AccessControl{
         // reserved streams management
         // sets how much can be drawn down
         if(reserved[_payer].alive) {
-            _amount = calcEarMarked(_payer, _stream.reserved, _amount, false);
+            _amount = calcEarMarked(_payer, _stream.reserveIndex, _amount, false);
             reservedMaxSinceLast[_payer] = block.timestamp;
             // updates values held in the SummedArrays
-            reserved[_payer].summedSinceLast.write(_stream.reserved, _amount, 0);
+            reserved[_payer].summedSinceLast.write(_stream.reserveIndex, _amount, 0);
         } else {
-            _amount = calcEarMarked(_payer, 0, _amount, true);
+            _amount = streamSize(_payer, _id);
             // updates values held in the SummedArrays
         }
-
         // if it is not a custom contract
         // calls the borrow function in V2
         IalcV2Vault(adrAlcV2).mintFrom( // <- TODO integration with V2
@@ -236,6 +285,14 @@ contract StreamPay is AccessControl{
         );
 
         gets[_payer][_id].sinceLast += block.timestamp;
+
+        if(_stream.end <= block.timestamp){
+            // deletes stream if its to be closed
+            _editStream(_id, true, 0);
+        }
+
+        uint256 totalPayOut = updateTotalPayOut(gets[msg.sender][_id].sinceLast, gets[msg.sender][_id].end, gets[msg.sender][_id].cps);
+        gets[msg.sender][_id].totalPayOut = totalPayOut;
 
         if(_stream.route.length > 0){
             /*
@@ -257,6 +314,7 @@ contract StreamPay is AccessControl{
 
             require(0 == IERC20(coinAddress).balanceOf(_stream.route[0]), "Coins did not move on");
         }
+        emit streamCollected(_payer, _amount, totalPayOut);
         return success;
     }
 
@@ -322,18 +380,12 @@ contract StreamPay is AccessControl{
         return keccak256(abi.encodePacked(_from, _id, _stream.payee, _stream.cps, _stream.freq, _stream.end));
     }
 
-/*
     function reserveStream(
         uint256 _id
-    ) external {
-        address[2] memory tmp = [msg.sender, address(this)];
-        reserved[msg.sender] = ResStream(
-            new SummedArrays(maxSteps, tmp),
-            new SummedArrays(maxSteps, tmp),
-            true);
-        gets[msg.sender][_id].reserved = true;
+    ) external hasReservation(msg.sender) {
+        reserved[msg.sender].summedCps.newData(gets[msg.sender][_id].cps);
+        reserved[msg.sender].summedSinceLast.newData(gets[msg.sender][_id].sinceLast);
     }
-*/
 
     /// @notice gets how much is already reserved and says if an amount is possible or not
     function calcEarMarked(
@@ -341,7 +393,7 @@ contract StreamPay is AccessControl{
         uint16 _index, /*how many streams*/
         uint256 _asking,
         bool _max
-    ) public view returns (uint256 _canBorrow){
+    ) public view hasReservation(_payer) returns (uint256 _canBorrow){
         uint256 _summedCps = _max ? reserved[_payer].summedCps.max() : reserved[_payer].summedCps.read(_index);
         uint256 _summedSinceLast = _max ? reserved[_payer].summedSinceLast.max() : reserved[_payer].summedSinceLast.read(_index); /*Sum of all streams*/
         uint256 _accurateDiv = (_summedCps % _index) + (_summedCps / _index) /*division without loosing accuracy to get an average CPS for all the streams involved*/;
@@ -354,9 +406,87 @@ contract StreamPay is AccessControl{
         - _asking; // whats left
     }
 
+    function swapResStreams(
+        uint256 _index1,
+        uint256 _index2
+    ) external res_d_Streams(
+        _index1, _index2){
+        uint16 _tempIndex = gets[msg.sender][_index1].reserveIndex;
+        gets[msg.sender][_index1].reserveIndex = gets[msg.sender][_index2].reserveIndex;
+        gets[msg.sender][_index2].reserveIndex = _tempIndex;
+        reserved[msg.sender].summedSinceLast.swap(gets[msg.sender][_index1].reserveIndex, gets[msg.sender][_index2].reserveIndex);
+        reserved[msg.sender].summedCps.swap(gets[msg.sender][_index1].reserveIndex, gets[msg.sender][_index2].reserveIndex);
+    }
+
+    function setMaxSteps(
+        uint8 _max
+    ) external adminOnly {
+        maxSteps = _max;
+        maxIndex = uint16(2**(_max + 1));
+    }
+
+    function updateTotalPayOut(
+        uint256 _sinceLast,
+        uint256 _end,
+        uint256 _cps
+    ) internal pure returns(uint256) {
+        if(_end == 0){
+            return 0;
+        }
+        return (_sinceLast - _end) * _cps;
+    }
+
+    /// @notice returns the max amount of coins that can be borrowed - reserved coins etc
+    /// @dev take this number and / by av daily returns
+    function calcRunwayLeft(
+        address _payer
+    ) external view returns (uint256 _available, uint256 _totalCps){
+        _available = calcEarMarked(
+            _payer,
+            maxIndex,
+            0,
+            true);
+        _totalCps = totalCPS[_payer];
+    }
+
     modifier adminOnly {
         // only admin address can call this (could be changed to the multisig or DAO)
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
+        _;
+    }
+
+    /// makes account if there isnt one
+    modifier startReservation(
+        address _account){
+        if(!reserved[_account].alive){
+            address[2] memory tmp = [msg.sender, address(this)];
+            reserved[msg.sender] = ResStream(
+                new SummedArrays(maxSteps, tmp),
+                new SummedArrays(maxSteps, tmp),
+                true);
+        }
+        _;
+    }
+
+    function _hasReservation(
+        address _account
+    ) internal view returns (bool){
+        return reserved[_account].alive;
+    }
+
+    modifier res_d_Streams(
+        uint256 _s1,
+        uint256 _s2
+    ) {
+        require(gets[msg.sender][_s1].reserveIndex > maxIndex);
+        require(gets[msg.sender][_s2].reserveIndex > maxIndex);
+        _;
+    }
+
+    modifier hasReservation(
+        address _account
+    ){
+        require(reserved[_account].alive, "Not a reserved stream");
         _;
     }
 
@@ -381,6 +511,12 @@ contract StreamPay is AccessControl{
 
     event adminChanged (
         address indexed newAddr
+    );
+
+    event streamCollected(
+        address payer,
+        uint256 amount,
+        uint256 runwayLeft
     );
 
     /// think about what events im going to emit
