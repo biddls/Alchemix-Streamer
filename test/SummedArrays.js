@@ -24,10 +24,32 @@ describe("Summed Arrays testing", function () {
     });
     describe("Testing and reading data", async function() {
         it("Smol start", async function () {
+            // to get 100% coverage
             await vars.summedArs.write(45, 10, 0)
+            await expect (vars.summedArs.write(0, 0, 0)).to.be.reverted
             expect(await vars.summedArs.data(45)).to.equal(10)
             expect(await vars.summedArs.data(46)).to.equal(10)
             expect(await vars.summedArs.data(48)).to.equal(10)
+            expect(await vars.summedArs.max()).to.equal(10)
+            await vars.summedArs.write(45, 0, 10)
+            expect(await vars.summedArs.max()).to.equal(0)
+            await vars.summedArs.write(1, 10, 0)
+            expect(await vars.summedArs.read(1)).to.equal(10)
+            await vars.summedArs.write(2, 5, 0)
+            await vars.summedArs.write(45, 10, 0)
+            expect(await vars.summedArs.data(45)).to.equal(10)
+            expect(await vars.summedArs.read(45)).to.equal(25)
+            await vars.summedArs.clear(45)
+            expect(await vars.summedArs.read(2)).to.equal(15)
+            expect(await vars.summedArs.read(1)).to.equal(10)
+            expect(await vars.summedArs.data(2)).to.equal(15)
+            expect(await vars.summedArs.data(1)).to.equal(10)
+            await vars.summedArs.swap(1, 2)
+            // await expect (vars.summedArs.swap(1, 0)).to.be.reverted
+            // expect(await vars.summedArs.read(0)).to.equal(5)
+            // expect(await vars.summedArs.read(1)).to.equal(15)
+            // await vars.summedArs.clear(1)
+            // await vars.summedArs.selfDes()
         });
         it("larger toggleable", async function () {
             if(false) {

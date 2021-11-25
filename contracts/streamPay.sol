@@ -21,6 +21,9 @@ contract StreamPay is AccessControl{
     /// @dev mapping from => Reserved stream
     mapping(address => ResStream) public reserved;
 
+    /// @dev reverse lookup from reserved stream to gets data
+    mapping(address => mapping(uint16 => uint256)) public resRevGets;
+
     /// @dev mapping account => since last draw down from all streams
     mapping(address => uint256) public reservedMaxSinceLast;
 
@@ -144,7 +147,7 @@ contract StreamPay is AccessControl{
         /// cant send 0 coins
         require(_cps > 0, "should not stream 0 coins");
         /// cant end before _start
-        require(_end > _start, "Cant end before you have started");
+        require(_end == 0 || _end > _start, "Cant end before you have started");
         /// gets the next stream ID number
         uint256 _nextID = streams[msg.sender];
         gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "", maxIndex, updateTotalPayOut(_start, _end, _cps));
@@ -381,10 +384,13 @@ contract StreamPay is AccessControl{
     }
 
     function reserveStream(
-        uint256 _id
+        uint256 _id,
+        uint16 _priority
     ) external hasReservation(msg.sender) {
-        reserved[msg.sender].summedCps.newData(gets[msg.sender][_id].cps);
-        reserved[msg.sender].summedSinceLast.newData(gets[msg.sender][_id].sinceLast);
+        require(gets[msg.sender][resRevGets[msg.sender][_priority]].cps != 0);
+        reserved[msg.sender].summedCps.write(_priority, gets[msg.sender][_id].cps, 0);
+        reserved[msg.sender].summedSinceLast.write(_priority, gets[msg.sender][_id].sinceLast, 0);
+        resRevGets[msg.sender][_priority] = _id;
     }
 
     /// @notice gets how much is already reserved and says if an amount is possible or not
@@ -416,6 +422,8 @@ contract StreamPay is AccessControl{
         gets[msg.sender][_index2].reserveIndex = _tempIndex;
         reserved[msg.sender].summedSinceLast.swap(gets[msg.sender][_index1].reserveIndex, gets[msg.sender][_index2].reserveIndex);
         reserved[msg.sender].summedCps.swap(gets[msg.sender][_index1].reserveIndex, gets[msg.sender][_index2].reserveIndex);
+        resRevGets[msg.sender][gets[msg.sender][_index1].reserveIndex] = _index2;
+        resRevGets[msg.sender][gets[msg.sender][_index2].reserveIndex] = _index1;
     }
 
     function setMaxSteps(
@@ -433,7 +441,7 @@ contract StreamPay is AccessControl{
         if(_end == 0){
             return 0;
         }
-        return (_sinceLast - _end) * _cps;
+        return (_end - _sinceLast) * _cps;
     }
 
     /// @notice returns the max amount of coins that can be borrowed - reserved coins etc

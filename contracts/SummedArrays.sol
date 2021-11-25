@@ -13,19 +13,17 @@ contract SummedArrays{
     uint8 immutable public maxSteps;
     /// @dev array of addresses for the deploying contract and the owner of the stream
     address[2] public admins;
-    /// @dev
-    uint16[] public next;
 
     constructor(uint8 _maxSteps, address[2] memory _admins){
         maxSteps = _maxSteps;
         admins = _admins;
-        next.push(0);
     }
 
     function read(
         uint16 _nubIndex
     ) external view adminsOnly maxSizeCheck(_nubIndex, false)
     returns (uint256) {
+        require(_nubIndex != 0, "cant access 0");
         return _read(_nubIndex);
     }
 
@@ -33,9 +31,7 @@ contract SummedArrays{
         uint16 _nubIndex
     ) internal view adminsOnly
     returns (uint256 total){
-        if(_nubIndex == 0){
-            return data[0];
-        } else if(_nubIndex == 2**(1 +maxSteps)) {
+        if(_nubIndex == 2**(1 +maxSteps)) {
             return data[uint16(2**(1 +maxSteps))];
         }
         // converts to bit array
@@ -56,34 +52,21 @@ contract SummedArrays{
         uint16 _nubIndex,
         uint256 _posChange,
         uint256 _negChange
-    ) external adminsOnly maxSizeCheck(_nubIndex, true) {
-        _write(_nubIndex, _posChange, _negChange);
-    }
-
-    function newData(
-        uint256 _value
-    ) external adminsOnly {
-        uint16 _index = _pop(next);
-        _maxSizeCheck(_index, true);
-        _write(_index, _value, 0);
-        if(next.length == 0){
-            next.push(_index + 1);
-        }
+    ) external adminsOnly maxSizeCheck(_nubIndex, true) returns (bool){
+        require(_nubIndex != 0, "cant get 0");
+        return _write(_nubIndex, _posChange, _negChange);
     }
 
     function _write(
         uint16 _nubIndex,
         uint256 _posChange,
         uint256 _negChange
-    ) internal adminsOnly returns (bool){
+    ) internal adminsOnly returns (bool){ // returns true if the array is empty
         /*
         using bit shifting you can then use an AND function on the data to get the next index
         */
-        data[_nubIndex] = data[_nubIndex] + _posChange - _negChange;
-        if(_nubIndex == 0){
-            _nubIndex = 1;
-            data[_nubIndex] = data[_nubIndex] + _posChange - _negChange;
-        }
+        data[_nubIndex] = updatePoint(data[_nubIndex], _posChange, _negChange);
+
         // converts to bit array
         bytes2 _index = bytes2(_nubIndex);
         for (uint8 i = 1; i <= maxSteps + 1; i++){
@@ -101,9 +84,19 @@ contract SummedArrays{
                 _index = BitOps.clearBit(_index, i-1);
             }
         }
-        data[uint16(2**(maxSteps + 1))] = data[uint16(2**(maxSteps + 1))] + _posChange - _negChange;
+//        data[uint16(2**(maxSteps + 1))] = data[uint16(2**(maxSteps + 1))] + _posChange - _negChange;
         if(data[uint16(2**(maxSteps + 1))] == 0){return true;}
         return false;
+    }
+
+    function updatePoint(
+        uint256 _data,
+        uint256 _pos,
+        uint256 _neg
+    ) internal view returns (uint256){
+        require((_pos != 0) != (_neg != 0), "one value has to be 0");
+        require(_data >= _neg, "cant underflow");
+        return _pos == 0 ? _data - _neg : _data + _pos;
     }
 
 /*
@@ -136,9 +129,7 @@ contract SummedArrays{
     function clear(
         uint16 _nubIndex
     ) external adminsOnly maxSizeCheck(_nubIndex, true) returns (bool){
-        _write(_nubIndex, 0, _read(_nubIndex));
-        next.push(_nubIndex);
-        return true;
+        return _write(_nubIndex, 0, _read(_nubIndex) - _read(_nubIndex - 1));
     }
 
     modifier adminsOnly {
@@ -151,15 +142,10 @@ contract SummedArrays{
         bool _writing
     ) maxSizeCheck(_numb, _writing) internal {}
 
-    function _pop(uint16[] storage _array) internal returns (uint16 _item){
-        _item = _array[_array.length-1];
-        _array.pop();
-        return _item;
-    }
-
     function swap(uint16 index1, uint16 index2) external {
-        uint256 numb1 = _read(index1);
-        uint256 numb2 = _read(index2);
+        require((index1 < index2) && ((index1 + index2) > 1), "correct ordering and no 0s");
+        uint256 numb1 = index1 == 0 ? _read(index1) : _read(index1) - _read(index1 - 1);
+        uint256 numb2 = _read(index2) - _read(index2 - 1);
         _write(index1, numb2, numb1);
         _write(index2, numb1, numb2);
     }
