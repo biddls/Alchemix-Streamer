@@ -237,4 +237,21 @@ describe("streamPay", function () {
                 vars.addr1.address, 0)).to.be.revertedWith("Stream owner must always have access");
         });
     });
+    describe("Stream reservation system", async function () {
+        it("Reserve a stream", async function () {
+            // create stream
+            await vars.streamPay.createStream(
+                vars.addr1.address, 1, 0, 0, 0, []);
+            // reserve it
+            await vars.streamPay.reserveStream(0, 1);
+            // checks to see if it all worked properly
+            expect( vars.streamPay.reserved[2] ).to.equal(true);
+        });
+        it("remove stream from being reserved", async function () {
+        });
+        it("checks around drawing down", async function () {
+        });
+        it("breaky breaky time", async function () {
+        });
+    });
 });

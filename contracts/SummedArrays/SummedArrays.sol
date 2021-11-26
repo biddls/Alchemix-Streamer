@@ -87,7 +87,7 @@ contract SummedArrays{
         uint256 _data,
         uint256 _pos,
         uint256 _neg
-    ) internal view returns (uint256){
+    ) internal pure returns (uint256){
         require((_pos != 0) != (_neg != 0), "one value has to be 0");
         require(_data >= _neg, "cant underflow");
         return _data + _pos - _neg;
@@ -115,11 +115,20 @@ contract SummedArrays{
     ) maxSizeCheck(_numb, _writing) internal {}
 
     function swap(uint16 index1, uint16 index2) external {
-        require((index1 < index2) && ((index1 + index2) > 1), "correct ordering and no 0s");
-        uint256 numb1 = index1 == 0 ? _read(index1) : _read(index1) - _read(index1 - 1);
+        require(index1 < index2, "incorrect ordering");
+        require(index1 >= 1, "no 0s");
+        uint256 numb1 = index1 == 0 ? _read(index1) : _read(index1) - _read(max(index1 - 1, 1));
         uint256 numb2 = _read(index2) - _read(index2 - 1);
         _write(index1, numb2, numb1);
         _write(index2, numb1, numb2);
+    }
+
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
+
+    function max(uint16 a, uint16 b) internal pure returns (uint16) {
+        return a >= b ? a : b;
     }
 
     modifier maxSizeCheck(uint16 _numb, bool _writing) {
@@ -131,8 +140,7 @@ contract SummedArrays{
         _;
     }
 
-    function selfDes(
-    ) adminsOnly public {
+    function selfDes() adminsOnly public {
         selfdestruct(payable(address(admins[0])));
     }
 }
