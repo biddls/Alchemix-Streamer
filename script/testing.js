@@ -90,7 +90,7 @@ const testingGeneral = async function(decimals) {
         addrs: addrs};
 }
 
-const testingSumedArrs = async function(_maxSteps) {
+const testingSummedArrs = async function(_maxSteps) {
     let [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
     const balance = await owner.getBalance();
 
@@ -113,8 +113,25 @@ const testingSumedArrs = async function(_maxSteps) {
         addrs};
 }
 
+const testingSimpleSummedArrs = async function(_maxSteps) {
+    let [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
+    const balance = await owner.get
+
+    let Token = await ethers.getContractFactory('SimpleSummedArrays');
+
+    const ssa = await Token.deploy(_maxSteps, [owner.address, addr1.address]);
+
+    return {balance,
+        ssa,
+        owner,
+        addr1,
+        addr2,
+        addrs};
+}
+
 module.exports = {
     testing,
     testingGeneral,
-    testingSumedArrs
+    testingSummedArrs,
+    testingSimpleSummedArrs
 }
