@@ -26,23 +26,16 @@ contract SimpleSummedArrays{
         uint16 _nubIndex,
         bool updating
     ) external adminsOnly maxSizeCheck(_nubIndex)
-    returns (uint256) {
-        require(block.timestamp > sinceLast);
-        return _calcReserved(_nubIndex, updating);
-    }
-
-    function _calcReserved(
-        uint16 _nubIndex,
-        bool updating
-    ) internal
     returns (uint256 total) {
+        require(block.timestamp > sinceLast);
         uint256 now = block.timestamp;
-        for(uint16 i = _nubIndex; i >= 0; i--) {
-            total += (now - sinceLastData[i]) * CPSData[i];
-            if(updating) {
-                sinceLastData[i] = now;
-            }
+        for(uint16 i = 0; i <= _nubIndex; i++) {
+            total = total + ((now - sinceLastData[i]) * CPSData[i]);
         }
+        if(updating) {
+            sinceLastData[_nubIndex] = now;
+        }
+        emit calcRes(total);
         return total;
     }
 
@@ -54,11 +47,7 @@ contract SimpleSummedArrays{
     // so you can just leave init as 0 so it defaults to now
     ) external adminsOnly maxSizeCheck(_nubIndex){
         CPSData[_nubIndex] = CPSData[_nubIndex] + _posChange - _negChange;
-        if (init != 0) {
-            sinceLastData[_nubIndex] = init;
-        } else {
-            sinceLastData[_nubIndex] = block.timestamp;
-        }
+        sinceLastData[_nubIndex] = init != 0 ? init : block.timestamp ;
     }
 
     function clear(
@@ -92,4 +81,12 @@ contract SimpleSummedArrays{
         // should be the user account is admins[0]
         selfdestruct(payable(address(admins[0])));
     }
+
+    function now() view external returns (uint256) {
+        return block.timestamp;
+    }
+
+    event calcRes(
+        uint256 amountReserved
+    );
 }

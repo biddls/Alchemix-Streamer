@@ -1,17 +1,8 @@
 const { expect } = require("chai");
 const { testing } = require("../script/testing.js");
+const { now, sleep } = require("./Util");
 
 const zero_address = "0x0000000000000000000000000000000000000000";
-
-
-function sleep(milliseconds) {
-    const start = Date.now();
-    while (Date.now() - start < milliseconds);
-}
-
-function now(){
-    return Math.floor(+new Date() / 1000);
-}
 
 describe("streamPay", function () {
 
