@@ -7,7 +7,7 @@ import {IStreamPay} from "./interfaces/IStreamPay.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IcustomRouter} from "./interfaces/IcustomRouter.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {SummedArrays} from "./SummedArrays.sol";
+import {SummedArrays} from "./SummedArrays/SummedArrays.sol";
 
 /// @title StreamPay
 /// @author Biddls.eth
@@ -150,13 +150,17 @@ contract StreamPay is AccessControl{
         require(_end == 0 || _end > _start, "Cant end before you have started");
         /// gets the next stream ID number
         uint256 _nextID = streams[msg.sender];
+        // fills in the database about the stream
         gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "", maxIndex, updateTotalPayOut(_start, _end, _cps));
+        // updates counter for total CPS payout
         totalCPS[msg.sender] += _cps;
+        // sets the role string that represents the role
         gets[msg.sender][_nextID].ROLE = genRole(msg.sender, _nextID, gets[msg.sender][_nextID]);
+        // sets the correct permissions for the stream
         grantRole(gets[msg.sender][_nextID].ROLE, msg.sender);
         /// increments the number of streams from that address (starting from a 0)
         streams[msg.sender]++;
-
+        // emmit events
         emit streamStarted(msg.sender, _nextID, _to);
     }
 

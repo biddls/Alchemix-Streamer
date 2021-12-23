@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {BitOps} from "./utils/BitOps.sol";
+import {BitOps} from "../utils/BitOps.sol";
 
 contract SimpleSummedArrays{
 

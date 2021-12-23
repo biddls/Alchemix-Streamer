@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {BitOps} from "./utils/BitOps.sol";
+import {BitOps} from "./../utils/BitOps.sol";
 //import {console} from "hardhat/console.sol";
 
 contract SummedArrays{
@@ -71,11 +71,6 @@ contract SummedArrays{
         bytes2 _index = bytes2(_nubIndex);
         for (uint8 i = 1; i <= maxSteps + 1; i++){
 
-/* testing //
-            logBytes(_index);
-            console.log(BitOps.getBit(_index, i-1) == true, BitOps.getBit(_index, i) == false);
-*/
-
             if(BitOps.getBit(_index, i-1) == true && BitOps.getBit(_index, i) == false){
                 _index = BitOps.clearBit(_index, i-1);
                 _index = BitOps.setBit(_index, i);
@@ -84,7 +79,6 @@ contract SummedArrays{
                 _index = BitOps.clearBit(_index, i-1);
             }
         }
-//        data[uint16(2**(maxSteps + 1))] = data[uint16(2**(maxSteps + 1))] + _posChange - _negChange;
         if(data[uint16(2**(maxSteps + 1))] == 0){return true;}
         return false;
     }
@@ -96,30 +90,8 @@ contract SummedArrays{
     ) internal view returns (uint256){
         require((_pos != 0) != (_neg != 0), "one value has to be 0");
         require(_data >= _neg, "cant underflow");
-        return _pos == 0 ? _data - _neg : _data + _pos;
+        return _data + _pos - _neg;
     }
-
-/*
-    function logBytes(bytes2 _data) public {
-        string memory _temp = new string(16);
-        for (uint8 i = 0; i < 16; i++){
-            _temp = _stringReplace(_temp, i, BitOps.getBit(_data, i) ? "1" : "0");
-        }
-        console.log(_temp);
-    }
-
-    function _stringReplace(string memory _string, uint256 _pos, string memory _letter) internal pure returns (string memory) {
-        bytes memory _stringBytes = bytes(_string);
-        bytes memory result = new bytes(_stringBytes.length);
-
-        for(uint i = 0; i < _stringBytes.length; i++) {
-            result[i] = _stringBytes[i];
-            if(i==_pos)
-                result[i]=bytes(_letter)[0];
-        }
-        return string(result);
-    }
-*/
 
     function max(
     ) external view returns (uint256){

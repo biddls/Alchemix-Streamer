@@ -7,7 +7,7 @@ import {IStreamPay} from "./interfaces/IStreamPay.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IcustomRouter} from "./interfaces/IcustomRouter.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {SummedArrays} from "./SummedArrays.sol";
+import {SummedArrays} from "./SummedArrays/SummedArrays.sol";
 
 /// @title StreamPay
 /// @author Biddls.eth
