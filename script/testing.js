@@ -11,7 +11,7 @@ const testing = async function() {
 
     // streamer
     contract = await ethers.getContractFactory("StreamPay");
-    const streamPay = await contract.deploy(5, 2);
+    const streamPay = await contract.deploy(5);
 
     // streamer.changeAlcV2(addr1.address);
     // streamer.setCoinAddress(addr2.address);

@@ -41,13 +41,16 @@ contract SimpleSummedArrays{
 
     function write(
         uint16 _nubIndex,
-        uint256 _posChange,
-        uint256 _negChange,
-        uint256 init // is recommended you also do a draw down at the same time as this
-    // so you can just leave init as 0 so it defaults to now
+        uint256 _posCPSChange,
+        uint256 _negCPSChange,
+        uint256 init
+    // it is recommended you also do a draw down at the same time
+    // as this so you can just leave init as 0 so it defaults to now
     ) external adminsOnly maxSizeCheck(_nubIndex){
-        CPSData[_nubIndex] = CPSData[_nubIndex] + _posChange - _negChange;
-        sinceLastData[_nubIndex] = init != 0 ? init : block.timestamp ;
+        // updates internal data
+        CPSData[_nubIndex] = CPSData[_nubIndex] + _posCPSChange - _negCPSChange;
+        // if init is 0 then just set since last to now
+        sinceLastData[_nubIndex] = init == 0 ? block.timestamp : init;
     }
 
     function clear(
