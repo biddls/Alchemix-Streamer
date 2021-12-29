@@ -18,7 +18,6 @@ describe("streamPay", function () {
             await expect(vars.streamPay.changeAlcV2(vars.addr1.address))
                 .to.emit(vars.streamPay, 'changedAlcV2')
                 .withArgs(vars.addr1.address);
-
             await expect(vars.streamPay.setCoinAddress(vars.addr2.address))
                 .to.emit(vars.streamPay, 'coinAddressChanged')
                 .withArgs(vars.addr2.address);
