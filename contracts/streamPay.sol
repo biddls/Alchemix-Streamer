@@ -166,7 +166,7 @@ contract StreamPay is AccessControl{
         uint256 _id, // the ID of the stream
         bool _emergencyClose,
         uint256 _end
-    ) external {
+    ) public {
         if(_emergencyClose && _end < block.timestamp){
             _collectStream(msg.sender, _id, gets[msg.sender][_id]);
         }
@@ -179,14 +179,13 @@ contract StreamPay is AccessControl{
         uint256 _end
     ) internal {
         if(_emergencyClose){
-            if(_end < block.timestamp){
-                if(reserved[msg.sender].alive){
-                    reserved[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
-                }
+            if(_end < block.timestamp && reserved[msg.sender].alive){
+                reserved[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
             }
             // updates total payout rate
             totalCPS[msg.sender] -= gets[msg.sender][_id].cps;
-            streams[msg.sender] -= 1;
+            require(streams[msg.sender] > 0, "stream count to smol");
+            streams[msg.sender]--;
             // deletes it without the opportunity for the receiver to claim what ever they owe
             delete gets[msg.sender][_id];
             emit streamClosed(msg.sender, _id);
@@ -195,47 +194,51 @@ contract StreamPay is AccessControl{
         gets[msg.sender][_id].end = _end;
         // empties the stream and then deletes it if its already closed
         gets[msg.sender][_id].totalPayOut = updateTotalPayOut(gets[msg.sender][_id].sinceLast, _end, gets[msg.sender][_id].cps);
-        if(reserved[msg.sender].alive){
-            // if its properly closed
-            if(block.timestamp >= _end){reserved[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);}
+        // updates the res stream data
+        if(_end < block.timestamp){
+            if(reserved[msg.sender].alive){
+                reserved[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
+            }
+            emit streamClosed(msg.sender, _id);
         }
     }
 
     /// @notice Allows the user to edit a streams CPS
     /// @dev This works from msg.sender so you cant do this on behalf of another address with out building something externaly
     /// @param _id the ID of the stream
-    /// @param _cps if back pay is allowed, until when?
+    /// @param _cps new cps
     function editStreamCps(
         uint256 _id, // the ID of the stream
         uint256 _cps
     ) external {
-//        require(_cps != 0);
-//        uint256 _oldCps = gets[msg.sender][_id].cps;
-//        require(_oldCps != _cps);
-//        _oldCps > _cps ? totalCPS[msg.sender] -= _oldCps - _cps : totalCPS[msg.sender] += _oldCps - _cps ;
-//        gets[msg.sender][_id].cps = _cps;
-//        gets[msg.sender][_id].totalPayOut = updateTotalPayOut(gets[msg.sender][_id].sinceLast, gets[msg.sender][_id].end, _cps);
-//        // empties the stream and then deletes it if its already closed
-//        if(reserved[msg.sender].alive){
-//            // if its properly closed
-//            if(_oldCps < _cps){reserved[msg.sender].summedCps.write(gets[msg.sender][_id].reserveIndex, 0, _cps - _oldCps);}
-//            // if its in the future
-//            else if(_oldCps > _cps){reserved[msg.sender].summedCps.write(gets[msg.sender][_id].reserveIndex, _oldCps - _cps, 0);}
-//            // if its closed on the dot then it just sets it to 0
-//            else {reserved[msg.sender].summedCps.write(gets[msg.sender][_id].reserveIndex, 0, _oldCps);}
-//        }
+        // close the stream if CPS is 0
+        if(_cps == 0){editStream(_id, true, 0);}
+        // holds old data
+        uint256 _oldCps = gets[msg.sender][_id].cps;
+        // makes sure that there is a change happening
+        require(_oldCps != _cps);
+        // updates totalCPS (payout rate)
+        _oldCps > _cps ? totalCPS[msg.sender] -= _oldCps - _cps : totalCPS[msg.sender] += _oldCps - _cps ;
+        // updates on chain data
+        gets[msg.sender][_id].cps = _cps;
+        // updates total payout for the streams data
+        gets[msg.sender][_id].totalPayOut = updateTotalPayOut(gets[msg.sender][_id].sinceLast, gets[msg.sender][_id].end, _cps);
+        // empties the stream and then deletes it if its already closed
+        if(reserved[msg.sender].alive){
+            reserved[msg.sender].reservedList.write(gets[msg.sender][_id].reserveIndex, _cps, _oldCps);
+        }
     }
 
-//    function clearReservedStream (
-//        address _account,
-//        uint16 _index
-//    ) internal {
+    function clearReservedStream (
+        address _account,
+        uint16 _index
+    ) internal {
 //        if(!_hasReservation(_account)){return;}
 //        // if its all empty then it deletes its
 //        if(reserved[_account].summedSinceLast.clear(_index) && reserved[_account].summedCps.clear(_index)){
 //            reserved[_account].alive = false;
 //        }
-//    }
+    }
 
     /// @notice Allows an approved address to collect a stream
     /// @param _payer the address that gives
