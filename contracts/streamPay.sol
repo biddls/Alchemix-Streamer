@@ -386,12 +386,15 @@ contract StreamPay is AccessControl{
     ) external hasReservation(msg.sender) {
         // make sure the stream is alive
         require(gets[msg.sender][_id].cps != 0);
+        // clear data currently held
         reserved[msg.sender].reservedList.clear(_priority);
+        // writes over the same data location that was just cleared
         reserved[msg.sender].reservedList.write(
             _priority,
             gets[msg.sender][_id].cps,
-            gets[msg.sender][_id].sinceLast,
+            0,
             gets[msg.sender][_id].sinceLast);
+        // updates local storage
         resRevGets[msg.sender][_priority] = _id;
     }
 
