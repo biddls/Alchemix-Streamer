@@ -7,7 +7,7 @@ import {IStreamPay} from "./interfaces/IStreamPay.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IcustomRouter} from "./interfaces/IcustomRouter.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {SummedArrays} from "./SummedArrays/SummedArrays.sol";
+import {SimpleSummedArrays} from "./SummedArrays/SimpleSummedArrays.sol";
 
 /// @title StreamPay
 /// @author Biddls.eth
@@ -56,7 +56,7 @@ contract StreamPay is AccessControl{
     /// @dev Struct that holds all the data about a reserved stream
     struct ResStream {
         /// @dev total above it summed: cps
-        SummedArrays reservedList;
+        SimpleSummedArrays reservedList;
         /// @dev tells the contract if the mapping is empty
         bool alive;
     }
@@ -225,7 +225,7 @@ contract StreamPay is AccessControl{
         gets[msg.sender][_id].totalPayOut = updateTotalPayOut(gets[msg.sender][_id].sinceLast, gets[msg.sender][_id].end, _cps);
         // empties the stream and then deletes it if its already closed
         if(reserved[msg.sender].alive){
-            reserved[msg.sender].reservedList.write(gets[msg.sender][_id].reserveIndex, _cps, _oldCps);
+            reserved[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
         }
     }
 
@@ -404,31 +404,25 @@ contract StreamPay is AccessControl{
         uint16 _index, /*how many streams*/
         uint256 _asking,
         bool _max
-    ) public view hasReservation(_payer) returns (uint256 _canBorrow){
-//        uint256 _summedCps = _max ? reserved[_payer].summedCps.max() : reserved[_payer].summedCps.read(_index);
-//        uint256 _summedSinceLast = _max ? reserved[_payer].summedSinceLast.max() : reserved[_payer].summedSinceLast.read(_index); /*Sum of all streams*/
-//        uint256 _accurateDiv = (_summedCps % _index) + (_summedCps / _index) /*division without loosing accuracy to get an average CPS for all the streams involved*/;
-//
-//        _canBorrow = IalcV2Vault(adrAlcV2).allowance(_payer) - // total to borrow
-//        ((_index *
-//        reservedMaxSinceLast[_payer]/*most recent unix time of draw down*/)
-//        - _summedSinceLast
-//        * _accurateDiv)
-//        - _asking; // whats left
+    ) public view returns (uint256 _canBorrow){
+        // gets the amount of coins that have been reserved
+        if(reserved[_payer].alive){
+            _canBorrow = reserved[_payer].reservedList.calcReserved(_index, false);
+        }
+        // local sotrage of variable to rediuce gas
+        uint256 _allowance = IalcV2Vault(adrAlcV2).allowance(_payer);
+        // avoids underflow
+        _canBorrow = _allowance >= _canBorrow ? _allowance - _canBorrow : 0;
     }
 
     function swapResStreams(
-        uint256 _index1,
-        uint256 _index2
+        uint256 _id1,
+        uint256 _id2
     ) external res_d_Streams(
-        _index1, _index2){
-//        uint16 _tempIndex = gets[msg.sender][_index1].reserveIndex;
-//        gets[msg.sender][_index1].reserveIndex = gets[msg.sender][_index2].reserveIndex;
-//        gets[msg.sender][_index2].reserveIndex = _tempIndex;
-//        reserved[msg.sender].summedSinceLast.swap(gets[msg.sender][_index1].reserveIndex, gets[msg.sender][_index2].reserveIndex);
-//        reserved[msg.sender].summedCps.swap(gets[msg.sender][_index1].reserveIndex, gets[msg.sender][_index2].reserveIndex);
-//        resRevGets[msg.sender][gets[msg.sender][_index1].reserveIndex] = _index2;
-//        resRevGets[msg.sender][gets[msg.sender][_index2].reserveIndex] = _index1;
+        _id1, _id2){
+        require(reserved[msg.sender].alive);
+        // todo swap back to gets instead of resRevGets
+        reserved[msg.sender].reservedList.swap(resRevGets[msg.sender][_id1], resRevGets[msg.sender][_id2]);
     }
 
     function setMaxSteps(
