@@ -212,7 +212,7 @@ contract StreamPay is AccessControl{
         uint256 _cps
     ) external {
         // close the stream if CPS is 0
-        if(_cps == 0){editStream(_id, true, 0);}
+        if(_cps == 0){editStream(_id, true, 0);return;}
         // holds old data
         uint256 _oldCps = gets[msg.sender][_id].cps;
         // makes sure that there is a change happening
@@ -232,12 +232,8 @@ contract StreamPay is AccessControl{
     function clearReservedStream (
         address _account,
         uint16 _index
-    ) internal {
-//        if(!_hasReservation(_account)){return;}
-//        // if its all empty then it deletes its
-//        if(reserved[_account].summedSinceLast.clear(_index) && reserved[_account].summedCps.clear(_index)){
-//            reserved[_account].alive = false;
-//        }
+    ) internal hasReservation(_account){
+        reserved[_account].reservedList.clear(_index);
     }
 
     /// @notice Allows an approved address to collect a stream
@@ -260,14 +256,12 @@ contract StreamPay is AccessControl{
         uint256 _id,
         Stream memory _stream
     ) internal returns (bool success){
-        uint256 _amount = streamSize(_payer, _id);
+        // returns how much its asking for
+        uint256 _amount;
         // reserved streams management
         // sets how much can be drawn down
         if(reserved[_payer].alive) {
-            _amount = calcEarMarked(_payer, _stream.reserveIndex, _amount, false);
-//            reservedMaxSinceLast[_payer] = block.timestamp;
-            // updates values held in the SummedArrays
-//            reserved[_payer].summedSinceLast.write(_stream.reserveIndex, _amount, 0);
+            _amount = calcEarMarked(_payer, _stream.reserveIndex, 0, false);
         } else {
             _amount = streamSize(_payer, _id);
             // updates values held in the SummedArrays
@@ -285,7 +279,9 @@ contract StreamPay is AccessControl{
 
         if(_stream.end <= block.timestamp){
             // deletes stream if its to be closed
-            _editStream(_id, true, 0);
+            _editStream(_id, true, 0);{
+                reserved[_payer].alive = false;
+            }
         }
 
         uint256 totalPayOut = updateTotalPayOut(gets[msg.sender][_id].sinceLast, gets[msg.sender][_id].end, gets[msg.sender][_id].cps);
@@ -323,15 +319,17 @@ contract StreamPay is AccessControl{
         address _payer,
         uint256 _id
     ) view public returns (uint256 _amount){
-//        Stream memory _stream = gets[_payer][_id];
-//        if((_stream.end >= block.timestamp) || (_stream.end == 0)){
-//            _amount = (_stream.freq + _stream.sinceLast) <= block.timestamp ?
-//            (block.timestamp - _stream.sinceLast) * _stream.cps : 0;
-//        } else {
-//            _amount = (_stream.freq + _stream.sinceLast) <= _stream.end ?
-//            (_stream.end - _stream.sinceLast) * _stream.cps : 0;
-//        }
-        return 1;
+        Stream memory _stream = gets[_payer][_id];
+        // if the stream has not closed or never closes
+        if((_stream.end >= block.timestamp) || (_stream.end == 0)){
+            _amount = (_stream.freq + _stream.sinceLast) <= block.timestamp ?
+            (block.timestamp - _stream.sinceLast) * _stream.cps : 0;
+        } else {
+            // if the stream is past its close by date
+            _amount = (_stream.freq + _stream.sinceLast) <= _stream.end ?
+            (_stream.end - _stream.sinceLast) * _stream.cps : 0;
+        }
+        return _amount;
     }
 
     /// @notice allows the user to grant other addresses to call on his/her behalf by default the receiver and the payer have the roles
@@ -378,14 +376,23 @@ contract StreamPay is AccessControl{
         return keccak256(abi.encodePacked(_from, _id, _stream.payee, _stream.cps, _stream.freq, _stream.end));
     }
 
+    /// @notice allows the user to reserve a stream
+    /// @param _id the ID number of the stream
+    /// @param _priority where on the reserved list does it sit
+    /// @dev it goes off of msg.sender so only the streams from / payee address can control this
     function reserveStream(
         uint256 _id,
         uint16 _priority
     ) external hasReservation(msg.sender) {
-//        require(gets[msg.sender][resRevGets[msg.sender][_priority]].cps != 0);
-//        reserved[msg.sender].summedCps.write(_priority, gets[msg.sender][_id].cps, 0);
-//        reserved[msg.sender].summedSinceLast.write(_priority, gets[msg.sender][_id].sinceLast, 0);
-//        resRevGets[msg.sender][_priority] = _id;
+        // make sure the stream is alive
+        require(gets[msg.sender][_id].cps != 0);
+        reserved[msg.sender].reservedList.clear(_priority);
+        reserved[msg.sender].reservedList.write(
+            _priority,
+            gets[msg.sender][_id].cps,
+            gets[msg.sender][_id].sinceLast,
+            gets[msg.sender][_id].sinceLast);
+        resRevGets[msg.sender][_priority] = _id;
     }
 
     /// @notice gets how much is already reserved and says if an amount is possible or not
