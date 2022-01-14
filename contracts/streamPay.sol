@@ -74,9 +74,9 @@ contract StreamPay is AccessControl{
     address public coinAddress;
 
     /// @dev Sets up a basic admin role for upgrade-ability
-    constructor (uint8 _maxSteps) {
+    constructor (uint8 _maxIndex) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        maxIndex = uint16(2**(_maxSteps + 1));
+        maxIndex = _maxIndex;
     }
 
     /// @notice Admin only function to change the stored address of alc V2
@@ -503,7 +503,7 @@ contract StreamPay is AccessControl{
     );
 
     event streamClosed (
-        address indexed from, /// not sure if this one is needed
+        address indexed from,
         uint256 indexed ID
     );
 
@@ -524,6 +524,4 @@ contract StreamPay is AccessControl{
         uint256 amount,
         uint256 runwayLeft
     );
-
-    /// think about what events im going to emit
 }
