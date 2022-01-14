@@ -153,6 +153,7 @@ contract StreamPay is AccessControl{
         grantRole(gets[msg.sender][_nextID].ROLE, msg.sender);
         /// increments the number of streams from that address (starting from a 0)
         streams[msg.sender]++;
+        require(streams[msg.sender] > 0);
         // emmit events
         emit streamStarted(msg.sender, _nextID, _to);
     }
@@ -184,8 +185,6 @@ contract StreamPay is AccessControl{
             }
             // updates total payout rate
             totalCPS[msg.sender] -= gets[msg.sender][_id].cps;
-            require(streams[msg.sender] > 0, "stream count to smol");
-            streams[msg.sender]--;
             // deletes it without the opportunity for the receiver to claim what ever they owe
             delete gets[msg.sender][_id];
             emit streamClosed(msg.sender, _id);
@@ -404,7 +403,7 @@ contract StreamPay is AccessControl{
         uint16 _index, /*how many streams*/
         uint256 _asking,
         bool _max
-    ) public view returns (uint256 _canBorrow){
+    ) public returns (uint256 _canBorrow){
         // gets the amount of coins that have been reserved
         if(reserved[_payer].alive){
             _canBorrow = reserved[_payer].reservedList.calcReserved(_index, false);
@@ -421,8 +420,9 @@ contract StreamPay is AccessControl{
     ) external res_d_Streams(
         _id1, _id2){
         require(reserved[msg.sender].alive);
-        // todo swap back to gets instead of resRevGets
-        reserved[msg.sender].reservedList.swap(resRevGets[msg.sender][_id1], resRevGets[msg.sender][_id2]);
+        reserved[msg.sender].reservedList.swap(
+            gets[msg.sender][_id1].reserveIndex,
+            gets[msg.sender][_id2].reserveIndex);
     }
 
     function setMaxSteps(
@@ -446,7 +446,7 @@ contract StreamPay is AccessControl{
     /// @dev take this number and / by av daily returns
     function calcRunwayLeft(
         address _payer
-    ) external view returns (uint256 _available, uint256 _totalCps){
+    ) external returns (uint256 _available, uint256 _totalCps){
         _available = calcEarMarked(
             _payer,
             maxIndex,
