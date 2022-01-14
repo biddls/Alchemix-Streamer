@@ -242,10 +242,11 @@ describe("streamPay", function () {
             // create stream
             await vars.streamPay.createStream(
                 vars.addr1.address, 1, 0, 0, 0, []);
+            await vars.streamPay.startReservation(vars.owner.address);
             // reserve it
             await vars.streamPay.reserveStream(0, 1);
             // checks to see if it all worked properly
-            expect( vars.streamPay.reserved[2] ).to.equal(true);
+            expect(await (await vars.streamPay.reserved(vars.owner.address)).alive).to.equal(true);
         });
         it("remove stream from being reserved", async function () {
         });

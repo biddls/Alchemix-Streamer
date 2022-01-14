@@ -12,12 +12,12 @@ contract SimpleSummedArrays{
     mapping(uint16 => uint256) public sinceLastData;
     mapping(uint16 => uint256) public CPSData;
     /// @dev maximum search distance
-    uint8 immutable public maxSteps;
+    uint8 immutable public maxIndex;
     /// @dev array of addresses for the deploying contract and the owner of the stream
     address[2] public admins;
 
-    constructor(uint8 _maxSteps, address[2] memory _admins){
-        maxSteps = _maxSteps;
+    constructor(uint8 _maxIndex, address[2] memory _admins){
+        maxIndex = _maxIndex;
         admins = _admins;
         sinceLast = block.timestamp;
     }
@@ -75,7 +75,7 @@ contract SimpleSummedArrays{
     }
 
     modifier maxSizeCheck(uint16 _numb) {
-        require(_numb < maxSteps, "Index out of bounds");
+        require(_numb < maxIndex, "Index out of bounds");
         _;
     }
 

@@ -28,7 +28,7 @@ contract StreamPay is AccessControl{
     mapping(address => uint256) public totalCPS;
 //
     /// @dev maximum search distance
-    uint16 public maxIndex;
+    uint8 public maxIndex;
 
     /// @dev Struct that holds all the data about a stream
     struct Stream {
@@ -414,19 +414,25 @@ contract StreamPay is AccessControl{
         _canBorrow = _allowance >= _canBorrow ? _allowance - _canBorrow : 0;
     }
 
+    /// @notice swaps the index of 2 reserved streams to change priority
+    /// @param _id1 the id of the 1st stream
+    /// @param _id2 the id of the 2nd stream
     function swapResStreams(
         uint256 _id1,
         uint256 _id2
-    ) external res_d_Streams(
-        _id1, _id2){
+    ) external {
         require(reserved[msg.sender].alive);
+        // ensures proper ordering of data
+        require(gets[msg.sender][_id1].reserveIndex > maxIndex);
+        require(gets[msg.sender][_id2].reserveIndex > maxIndex);
+        // performs the swap
         reserved[msg.sender].reservedList.swap(
             gets[msg.sender][_id1].reserveIndex,
             gets[msg.sender][_id2].reserveIndex);
     }
 
-    function setMaxSteps(
-        uint16 _max
+    function setMaxIndex(
+        uint8 _max
     ) external adminOnly {
         maxIndex = _max;
     }
@@ -461,33 +467,26 @@ contract StreamPay is AccessControl{
         _;
     }
 
-    /// makes account if there isnt one
-    modifier startReservation(
-        address _account){
-//        if(!reserved[_account].alive){
-//            address[2] memory tmp = [msg.sender, address(this)];
-//            reserved[msg.sender] = ResStream(
-//                new SummedArrays(maxSteps, tmp),
-//                new SummedArrays(maxSteps, tmp),
-//                true);
-//        }
-        _;
+    /// makes account if there isn't one
+    function startReservation(
+        address _account) external {
+        // makes sure to not duplicate the contract
+        require(!reserved[_account].alive);
+        // sets the admin addresses
+        address[2] memory tmp = [msg.sender, address(this)];
+        // creates the contract and updates the on chain data to point to it
+        reserved[msg.sender] = ResStream(
+            new SimpleSummedArrays(maxIndex, tmp),
+            true);
     }
 
+/*
     function _hasReservation(
         address _account
     ) internal view returns (bool){
         return reserved[_account].alive;
     }
-
-    modifier res_d_Streams(
-        uint256 _s1,
-        uint256 _s2
-    ) {
-        require(gets[msg.sender][_s1].reserveIndex > maxIndex);
-        require(gets[msg.sender][_s2].reserveIndex > maxIndex);
-        _;
-    }
+*/
 
     modifier hasReservation(
         address _account
