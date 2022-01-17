@@ -19,10 +19,8 @@ contract StreamPay is AccessControl{
     mapping(address => mapping(uint256 => Stream)) public gets;
 
     // todo: merge both of these in just a general "account info thing"
-    /// @dev mapping from => Reserved stream
-    mapping(address => ResStream) public reserved;
-    /// @dev mapping account => total CPS for each payer
-    mapping(address => uint256) public totalCPS;
+    /// @dev mapping address => account data
+    mapping(address => Account) public accountData;
 
     /// @dev maximum search distance
     uint8 public maxIndex;
@@ -49,11 +47,13 @@ contract StreamPay is AccessControl{
     }
 
     /// @dev Struct that holds all the data about a reserved stream
-    struct ResStream {
+    struct Account {
         /// @dev total above it summed: cps
         SimpleSummedArrays reservedList;
         /// @dev tells the contract if the mapping is empty
         bool alive;
+        /// @dev current payout rate
+        uint256 totalCps;
     }
 
     /// @dev keeps track of the number of streams that an account has made (closing streams does not decrement this number)
@@ -141,7 +141,7 @@ contract StreamPay is AccessControl{
         // fills in the database about the stream
         gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "", maxIndex);
         // updates counter for total CPS payout
-        totalCPS[msg.sender] += _cps;
+        accountData[msg.sender].totalCps += _cps;
         // sets the role string that represents the role
         gets[msg.sender][_nextID].ROLE = genRole(msg.sender, _nextID, gets[msg.sender][_nextID]);
         // sets the correct permissions for the stream
@@ -175,11 +175,11 @@ contract StreamPay is AccessControl{
         uint256 _end
     ) internal {
         if(_emergencyClose){
-            if(_end < block.timestamp && reserved[msg.sender].alive){
-                reserved[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
+            if(_end < block.timestamp && accountData[msg.sender].alive){
+                accountData[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
             }
             // updates total payout rate
-            totalCPS[msg.sender] -= gets[msg.sender][_id].cps;
+            accountData[msg.sender].totalCps -= gets[msg.sender][_id].cps;
             // deletes it without the opportunity for the receiver to claim what ever they owe
             delete gets[msg.sender][_id];
             emit streamClosed(msg.sender, _id);
@@ -188,8 +188,8 @@ contract StreamPay is AccessControl{
         gets[msg.sender][_id].end = _end;
         // updates the res stream data
         if(_end < block.timestamp){
-            if(reserved[msg.sender].alive){
-                reserved[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
+            if(accountData[msg.sender].alive){
+                accountData[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
             }
             emit streamClosed(msg.sender, _id);
         }
@@ -210,12 +210,12 @@ contract StreamPay is AccessControl{
         // makes sure that there is a change happening
         require(_oldCps != _cps);
         // updates totalCPS (payout rate)
-        _oldCps > _cps ? totalCPS[msg.sender] -= _oldCps - _cps : totalCPS[msg.sender] += _oldCps - _cps ;
+        _oldCps > _cps ? accountData[msg.sender].totalCPS -= _oldCps - _cps : accountData[msg.sender].totalCps += _oldCps - _cps ;
         // updates on chain data
         gets[msg.sender][_id].cps = _cps;
         // empties the stream and then deletes it if its already closed
-        if(reserved[msg.sender].alive){
-            reserved[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
+        if(accountData[msg.sender].alive){
+            accountData[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
         }
     }
 
@@ -223,8 +223,8 @@ contract StreamPay is AccessControl{
         address _account,
         uint16 _index
     ) internal {
-        require(reserved[_account].alive, "Account not setup for reservations");
-        reserved[_account].reservedList.clear(_index);
+        require(accountData[_account].alive, "Account not setup for reservations");
+        accountData[_account].reservedList.clear(_index);
     }
 
     /// @notice Allows an approved address to collect a stream
@@ -251,7 +251,7 @@ contract StreamPay is AccessControl{
         uint256 _amount;
         // reserved streams management
         // sets how much can be drawn down
-        if(reserved[_payer].alive) {
+        if(accountData[_payer].alive) {
             _amount = calcEarMarked(_payer, _stream.reserveIndex, 0, false);
         } else {
             _amount = streamSize(_payer, _id);
@@ -271,7 +271,7 @@ contract StreamPay is AccessControl{
         if(_stream.end <= block.timestamp){
             // deletes stream if its to be closed
             _editStream(_id, true, 0);{
-                reserved[_payer].alive = false;
+                accountData[_payer].alive = false;
             }
         }
 
@@ -372,13 +372,13 @@ contract StreamPay is AccessControl{
         uint256 _id,
         uint16 _priority
     ) external{
-        require(reserved[msg.sender].alive, "Account not setup for reservations");
+        require(accountData[msg.sender].alive, "Account not setup for reservations");
         // make sure the stream is alive
         require(gets[msg.sender][_id].cps != 0);
         // clear data currently held
-        reserved[msg.sender].reservedList.clear(_priority);
+        accountData[msg.sender].reservedList.clear(_priority);
         // writes over the same data location that was just cleared
-        reserved[msg.sender].reservedList.write(
+        accountData[msg.sender].reservedList.write(
             _priority,
             gets[msg.sender][_id].cps,
             0,
@@ -395,8 +395,8 @@ contract StreamPay is AccessControl{
         bool _max
     ) public returns (uint256 _canBorrow){
         // gets the amount of coins that have been reserved
-        if(reserved[_payer].alive){
-            _canBorrow = reserved[_payer].reservedList.calcReserved(_index, false);
+        if(accountData[_payer].alive){
+            _canBorrow = accountData[_payer].reservedList.calcReserved(_index, false);
         }
         // local sotrage of variable to rediuce gas
         uint256 _allowance = IalcV2Vault(adrAlcV2).allowance(_payer);
@@ -411,12 +411,12 @@ contract StreamPay is AccessControl{
         uint256 _id1,
         uint256 _id2
     ) external {
-        require(reserved[msg.sender].alive);
+        require(accountData[msg.sender].alive);
         // ensures proper ordering of data
         require(gets[msg.sender][_id1].reserveIndex > maxIndex);
         require(gets[msg.sender][_id2].reserveIndex > maxIndex);
         // performs the swap
-        reserved[msg.sender].reservedList.swap(
+        accountData[msg.sender].reservedList.swap(
             gets[msg.sender][_id1].reserveIndex,
             gets[msg.sender][_id2].reserveIndex);
     }
@@ -450,7 +450,7 @@ contract StreamPay is AccessControl{
             maxIndex,
             0,
             true);
-        _totalCps = totalCPS[_payer];
+        _totalCps = accountData[_payer].totalCps;
     }
 
     modifier adminOnly {
@@ -463,11 +463,11 @@ contract StreamPay is AccessControl{
     function startReservation(
         address _account) external {
         // makes sure to not duplicate the contract
-        require(!reserved[_account].alive);
+        require(!accountData[_account].alive);
         // sets the admin addresses
         address[2] memory tmp = [_account, address(this)];
         // creates the contract and updates the on chain data to point to it
-        reserved[_account] = ResStream(
+        accountData[_account] = ResStream(
             new SimpleSummedArrays(maxIndex, tmp),
             true);
     }
