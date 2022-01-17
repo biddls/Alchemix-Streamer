@@ -78,8 +78,7 @@ describe("streamPay", function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamPay.createStream(
                 vars.addr1.address, 1, 0, now()-10, now()+10, []);
-            expect( await vars.streamPay.streams(vars.owner.address)).to.equal(1);
-
+            expect(await (await vars.streamPay.accountData(vars.owner.address)).streams).to.equal(1);
             await vars.v2.setLimit(100000);
             await expect(vars.streamPay.editStream(0, false, now()-3))
                 .to.emit(vars.streamPay, 'streamClosed');
@@ -88,7 +87,7 @@ describe("streamPay", function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamPay.createStream(
                 vars.addr1.address, 1, 0, now()-10, now()+10, []);
-            expect( await vars.streamPay.streams(vars.owner.address)).to.equal(1);
+            expect(await (await vars.streamPay.accountData(vars.owner.address)).streams).to.equal(1);
 
             await vars.v2.setLimit(100000);
 
@@ -99,7 +98,7 @@ describe("streamPay", function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamPay.createStream(
                 vars.addr1.address, 1, 0, now()-10, now()+10, []);
-            expect( await vars.streamPay.streams(vars.owner.address)).to.equal(1);
+            expect(await (await vars.streamPay.accountData(vars.owner.address)).streams).to.equal(1);
 
             await vars.v2.setLimit(100000);
 
@@ -246,7 +245,7 @@ describe("streamPay", function () {
             // reserve it
             await vars.streamPay.reserveStream(0, 1);
             // checks to see if it all worked properly
-            expect(await (await vars.streamPay.reserved(vars.owner.address)).alive).to.equal(true);
+            expect(await (await vars.streamPay.accountData(vars.owner.address)).alive).to.equal(true);
         });
         it("remove stream from being reserved", async function () {
         });

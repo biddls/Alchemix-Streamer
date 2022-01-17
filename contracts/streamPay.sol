@@ -53,12 +53,10 @@ contract StreamPay is AccessControl{
         /// @dev tells the contract if the mapping is empty
         bool alive;
         /// @dev current payout rate
-        uint256 totalCps;
+        uint256 totalCPS;
+        /// @dev number of streams that have ever been started
+        uint256 streams;
     }
-
-    /// @dev keeps track of the number of streams that an account has made (closing streams does not decrement this number)
-    /// this allows the payer to know what index to search up to
-    mapping(address => uint256) public streams;
 
     /// dont have all the info here so its harder to test something when you cant see it
     /// @dev alchemix vault V2 address
@@ -137,18 +135,18 @@ contract StreamPay is AccessControl{
         /// cant end before _start
         require(_end == 0 || _end > _start, "Cant end before you have started, unless it never ends");
         /// gets the next stream ID number
-        uint256 _nextID = streams[msg.sender];
+        uint256 _nextID = accountData[msg.sender].streams;
         // fills in the database about the stream
         gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "", maxIndex);
         // updates counter for total CPS payout
-        accountData[msg.sender].totalCps += _cps;
+        accountData[msg.sender].totalCPS += _cps;
         // sets the role string that represents the role
         gets[msg.sender][_nextID].ROLE = genRole(msg.sender, _nextID, gets[msg.sender][_nextID]);
         // sets the correct permissions for the stream
         grantRole(gets[msg.sender][_nextID].ROLE, msg.sender);
         /// increments the number of streams from that address (starting from a 0)
-        streams[msg.sender]++;
-        require(streams[msg.sender] > 0);
+        accountData[msg.sender].streams++;
+        require(accountData[msg.sender].streams > 0);
         // emmit events
         emit streamStarted(msg.sender, _nextID, _to);
     }
@@ -179,7 +177,7 @@ contract StreamPay is AccessControl{
                 accountData[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
             }
             // updates total payout rate
-            accountData[msg.sender].totalCps -= gets[msg.sender][_id].cps;
+            accountData[msg.sender].totalCPS -= gets[msg.sender][_id].cps;
             // deletes it without the opportunity for the receiver to claim what ever they owe
             delete gets[msg.sender][_id];
             emit streamClosed(msg.sender, _id);
@@ -210,7 +208,7 @@ contract StreamPay is AccessControl{
         // makes sure that there is a change happening
         require(_oldCps != _cps);
         // updates totalCPS (payout rate)
-        _oldCps > _cps ? accountData[msg.sender].totalCPS -= _oldCps - _cps : accountData[msg.sender].totalCps += _oldCps - _cps ;
+        _oldCps > _cps ? accountData[msg.sender].totalCPS -= _oldCps - _cps : accountData[msg.sender].totalCPS += _oldCps - _cps ;
         // updates on chain data
         gets[msg.sender][_id].cps = _cps;
         // empties the stream and then deletes it if its already closed
@@ -432,7 +430,7 @@ contract StreamPay is AccessControl{
     /// @param _payer the address that is paying out the funds
     /// @param _id the id number of the stream
     function calcTotalPayOut(
-        uint256 _payer,
+        address _payer,
         uint256 _id
     ) public view returns(uint256) {
         return gets[_payer][_id].end == 0 ? 2**256-1 :
@@ -450,7 +448,7 @@ contract StreamPay is AccessControl{
             maxIndex,
             0,
             true);
-        _totalCps = accountData[_payer].totalCps;
+        _totalCps = accountData[_payer].totalCPS;
     }
 
     modifier adminOnly {
@@ -467,9 +465,8 @@ contract StreamPay is AccessControl{
         // sets the admin addresses
         address[2] memory tmp = [_account, address(this)];
         // creates the contract and updates the on chain data to point to it
-        accountData[_account] = ResStream(
-            new SimpleSummedArrays(maxIndex, tmp),
-            true);
+        accountData[_account].reservedList = new SimpleSummedArrays(maxIndex, tmp);
+        accountData[_account].alive = true;
     }
 
     event streamStarted (
