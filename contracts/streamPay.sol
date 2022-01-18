@@ -18,7 +18,6 @@ contract StreamPay is AccessControl{
     /// @dev mapping from => ID => stream
     mapping(address => mapping(uint256 => Stream)) public gets;
 
-    // todo: merge both of these in just a general "account info thing"
     /// @dev mapping address => account data
     mapping(address => Account) public accountData;
 
@@ -43,7 +42,7 @@ contract StreamPay is AccessControl{
         /// @dev a role is generated which allows the owner to permission addresses to call collect the stream function
         bytes32 ROLE;
         /// @dev denotes if this stream is a reserved stream or not
-        uint16 reserveIndex;
+        uint8 reserveIndex;
     }
 
     /// @dev Struct that holds all the data about a reserved stream
@@ -173,7 +172,8 @@ contract StreamPay is AccessControl{
         uint256 _end
     ) internal {
         if(_emergencyClose){
-            if(_end < block.timestamp && accountData[msg.sender].alive){
+            if((_end < block.timestamp && accountData[msg.sender].alive) &&
+                gets[msg.sender][_id].reserveIndex < maxIndex){
                 accountData[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
             }
             // updates total payout rate
@@ -219,7 +219,7 @@ contract StreamPay is AccessControl{
 
     function clearReservedStream (
         address _account,
-        uint16 _index
+        uint8 _index
     ) internal {
         require(accountData[_account].alive, "Account not setup for reservations");
         accountData[_account].reservedList.clear(_index);
@@ -245,6 +245,7 @@ contract StreamPay is AccessControl{
         uint256 _id,
         Stream memory _stream
     ) internal returns (bool success){
+        // todo: update the SimpleSummedArrays to update the most recent draw down
         // returns how much its asking for
         uint256 _amount;
         // reserved streams management
@@ -368,7 +369,7 @@ contract StreamPay is AccessControl{
     /// @dev it goes off of msg.sender so only the streams from / payee address can control this
     function reserveStream(
         uint256 _id,
-        uint16 _priority
+        uint8 _priority
     ) external{
         require(accountData[msg.sender].alive, "Account not setup for reservations");
         // make sure the stream is alive
@@ -388,7 +389,7 @@ contract StreamPay is AccessControl{
     /// @notice gets how much is already reserved and says if an amount is possible or not
     function calcEarMarked(
         address _payer,
-        uint16 _index, /*how many streams*/
+        uint8 _index, /*how many streams*/
         uint256 _asking,
         bool _max
     ) public returns (uint256 _canBorrow){

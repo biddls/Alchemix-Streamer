@@ -17,15 +17,15 @@ contract SimpleSummedArrays{
     address[2] public admins;
 
     constructor(uint8 _maxIndex, address[2] memory _admins){
-        maxIndex = _maxIndex;
+        maxIndex = _maxIndex + 1;
         admins = _admins;
         sinceLast = block.timestamp;
     }
 
     function calcReserved(
-        uint16 _nubIndex,
+        uint8 _nubIndex,
         bool updating
-    ) external adminsOnly maxSizeCheck(_nubIndex)
+    ) external adminsOnly maxSizeCheck(_nubIndex, false)
     returns (uint256 total) {
         require(block.timestamp > sinceLast);
         uint256 now = block.timestamp;
@@ -40,13 +40,13 @@ contract SimpleSummedArrays{
     }
 
     function write(
-        uint16 _nubIndex,
+        uint8 _nubIndex,
         uint256 _posCPSChange,
         uint256 _negCPSChange,
         uint256 init
     // it is recommended you also do a draw down at the same time
     // as this so you can just leave init as 0 so it defaults to now
-    ) external adminsOnly maxSizeCheck(_nubIndex){
+    ) external adminsOnly maxSizeCheck(_nubIndex, true){
         // updates internal data
         CPSData[_nubIndex] = CPSData[_nubIndex] + _posCPSChange - _negCPSChange;
         // if init is 0 then just set since last to now
@@ -54,8 +54,8 @@ contract SimpleSummedArrays{
     }
 
     function clear(
-        uint16 _nubIndex
-    ) external adminsOnly maxSizeCheck(_nubIndex){
+        uint8 _nubIndex
+    ) external adminsOnly maxSizeCheck(_nubIndex, true){
         delete CPSData[_nubIndex];
         delete sinceLastData[_nubIndex];
     }
@@ -74,8 +74,12 @@ contract SimpleSummedArrays{
         CPSData[index2] = temp;
     }
 
-    modifier maxSizeCheck(uint16 _numb) {
-        require(_numb < maxIndex, "Index out of bounds");
+    modifier maxSizeCheck(uint8 _numb, bool _writing) {
+        if (_writing) {
+            require(_numb < maxIndex, "Index out of bounds");
+        } else {
+            require(_numb <= maxIndex, "Index out of bounds");
+        }
         _;
     }
 

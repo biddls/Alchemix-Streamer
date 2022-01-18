@@ -246,6 +246,20 @@ describe("streamPay", function () {
             await vars.streamPay.reserveStream(0, 1);
             // checks to see if it all worked properly
             expect(await (await vars.streamPay.accountData(vars.owner.address)).alive).to.equal(true);
+            expect((await vars.streamPay.gets(
+                vars.owner.address, 0)).payee)
+                .to.equal(vars.addr1.address);
+            // cant get the time one to behave but it seems to be working fine
+            expect((await vars.streamPay.gets(
+                vars.owner.address, 0)).cps)
+                .to.equal(BigInt("1"));
+            //idk how to test time stamp
+            expect((await vars.streamPay.gets(
+                vars.owner.address, 0)).freq)
+                .to.equal(0);
+            await vars.streamPay.collectStream(
+                vars.owner.address,
+                0);
         });
         it("remove stream from being reserved", async function () {
         });
