@@ -23,8 +23,7 @@ contract SimpleSummedArrays{
     }
 
     function calcReserved(
-        uint8 _nubIndex,
-        bool updating
+        uint8 _nubIndex
     ) external adminsOnly maxSizeCheck(_nubIndex, false)
     returns (uint256 total) {
         require(block.timestamp > sinceLast);
@@ -32,11 +31,14 @@ contract SimpleSummedArrays{
         for(uint16 i = 0; i <= _nubIndex; i++) {
             total = total + ((now - sinceLastData[i]) * CPSData[i]);
         }
-        if(updating) {
-            sinceLastData[_nubIndex] = now;
-        }
         emit calcRes(total);
         return total;
+    }
+
+    function updateSinceLast(
+        uint8 _nubIndex
+    ) external adminsOnly maxSizeCheck(_nubIndex, true) {
+        sinceLastData[_nubIndex] = block.timestamp;
     }
 
     function write(

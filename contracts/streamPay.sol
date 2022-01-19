@@ -10,7 +10,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SimpleSummedArrays} from "./SummedArrays/SimpleSummedArrays.sol";
 
 /// @title StreamPay
-/// @author Biddls.eth
+/// @author Biddls
 /// @notice Allows users to set up streams with custom contract routing
 /// @dev the lower feature version that requires more upkeep
 contract StreamPay is AccessControl{
@@ -245,7 +245,6 @@ contract StreamPay is AccessControl{
         uint256 _id,
         Stream memory _stream
     ) internal returns (bool success){
-        // todo: update the SimpleSummedArrays to update the most recent draw down
         // returns how much its asking for
         uint256 _amount;
         // reserved streams management
@@ -264,6 +263,10 @@ contract StreamPay is AccessControl{
         // this either sends the funds to the 1st custom cont or payee depending on if there is a route or not
             _stream.route.length > 0 ? _stream.route[0] : _stream.payee
         );
+
+        if(_stream.reserveIndex < maxIndex){
+            accountData[_payer].reservedList.updateSinceLast(_stream.reserveIndex);
+        }
 
         gets[_payer][_id].sinceLast += block.timestamp;
 
@@ -395,7 +398,7 @@ contract StreamPay is AccessControl{
     ) public returns (uint256 _canBorrow){
         // gets the amount of coins that have been reserved
         if(accountData[_payer].alive){
-            _canBorrow = accountData[_payer].reservedList.calcReserved(_index, false);
+            _canBorrow = accountData[_payer].reservedList.calcReserved(_index);
         }
         // local sotrage of variable to rediuce gas
         uint256 _allowance = IalcV2Vault(adrAlcV2).allowance(_payer);
