@@ -455,12 +455,6 @@ contract StreamPay is AccessControl{
         _totalCps = accountData[_payer].totalCPS;
     }
 
-    modifier adminOnly {
-        // only admin address can call this (could be changed to the multisig or DAO)
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
-        _;
-    }
-
     /// makes account if there isn't one
     function startReservation(
         address _account) external {
@@ -471,6 +465,12 @@ contract StreamPay is AccessControl{
         // creates the contract and updates the on chain data to point to it
         accountData[_account].reservedList = new SimpleSummedArrays(maxIndex, tmp);
         accountData[_account].alive = true;
+    }
+
+    modifier adminOnly {
+        // only admin address can call this (could be changed to the multisig or DAO)
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
+        _;
     }
 
     event streamStarted (
