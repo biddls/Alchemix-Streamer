@@ -243,7 +243,7 @@ describe("streamPay", function () {
                 vars.addr1.address, 1, 0, 0, 0, []);
             await vars.streamPay.startReservation(vars.owner.address);
             // reserve it
-            await vars.streamPay.reserveStream(0, 1);
+            await vars.streamPay.reserveStream(0, 0);
             // checks to see if it all worked properly
             expect(await (await vars.streamPay.accountData(vars.owner.address)).alive).to.equal(true);
             expect((await vars.streamPay.gets(
@@ -262,6 +262,32 @@ describe("streamPay", function () {
                 0);
         });
         it("remove stream from being reserved", async function () {
+            // create stream
+            await vars.streamPay.createStream(
+                vars.addr1.address, 1, 0, 0, 0, []);
+            await vars.streamPay.startReservation(vars.owner.address);
+            // reserve it
+            await vars.streamPay.reserveStream(0, 1);
+            // checks to see if it all worked properly
+            expect(await (await vars.streamPay.accountData(vars.owner.address)).alive).to.equal(true);
+            expect((await vars.streamPay.gets(
+                vars.owner.address, 0)).payee)
+                .to.equal(vars.addr1.address);
+            // cant get the time one to behave but it seems to be working fine
+            expect((await vars.streamPay.gets(
+                vars.owner.address, 0)).cps)
+                .to.equal(BigInt("1"));
+            //idk how to test time stamp
+            expect((await vars.streamPay.gets(
+                vars.owner.address, 0)).freq)
+                .to.equal(0);
+            await vars.streamPay.collectStream(
+                vars.owner.address,
+                0);
+            // checks to see if it all worked properly
+            expect(await (await vars.streamPay.accountData(vars.owner.address)).alive).to.equal(true);
+            // un-reserve a stream
+            await vars.streamPay.unReserveStream(0, 1);
         });
         it("checks around drawing down", async function () {
         });

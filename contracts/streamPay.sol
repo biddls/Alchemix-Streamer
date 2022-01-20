@@ -172,7 +172,7 @@ contract StreamPay is AccessControl{
         uint256 _end
     ) internal {
         if(_emergencyClose){
-            if((_end < block.timestamp && accountData[msg.sender].alive) &&
+            if((((_end >= block.timestamp) || (_end == 0)) && accountData[msg.sender].alive) &&
                 gets[msg.sender][_id].reserveIndex < maxIndex){
                 accountData[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
             }
@@ -185,7 +185,7 @@ contract StreamPay is AccessControl{
         }
         gets[msg.sender][_id].end = _end;
         // updates the res stream data
-        if(_end < block.timestamp){
+        if((_end >= block.timestamp) || (_end == 0)){
             if(accountData[msg.sender].alive){
                 accountData[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
             }
@@ -282,11 +282,11 @@ contract StreamPay is AccessControl{
             if it is a custom contract
             this allows for people to route funds though custom contracts
             like if you want to swap it to something or deposit into another protocol or anything
+            #############################
+            ###RISK OF REENTRANCY HERE###
+            #############################
             mby no risk of reentrancy as nothing else in the
             contract after this relies on the contracts own internal state
-            ##############################
-            ###RISK OF REENTRANCY HERE###
-            ##############################
             */
             IcustomRouter(_stream.route[0]).route(
                 coinAddress,
@@ -387,6 +387,21 @@ contract StreamPay is AccessControl{
             gets[msg.sender][_id].sinceLast);
         // updates local storage
 //        resRevGets[msg.sender][_priority] = _id;
+    }
+
+    /// @notice allows the user to un-reserve a stream
+    /// @param _id the ID number of the stream
+    /// @param _priority where on the reserved list does it sit
+    /// @dev it goes off of msg.sender so only the streams from / payee address can control this
+    function unReserveStream(
+        uint256 _id,
+        uint8 _priority
+    ) external{
+        require(accountData[msg.sender].alive, "Account not setup for reservations");
+        // make sure the stream is alive
+        require(gets[msg.sender][_id].cps != 0);
+        // clear data currently held
+        accountData[msg.sender].reservedList.clear(_priority);
     }
 
     /// @notice gets how much is already reserved and says if an amount is possible or not
