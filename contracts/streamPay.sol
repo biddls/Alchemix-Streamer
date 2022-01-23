@@ -160,7 +160,7 @@ contract StreamPay is AccessControl{
         bool _emergencyClose,
         uint256 _end
     ) public {
-        if(_emergencyClose && _end < block.timestamp){
+        if(_emergencyClose || ((_end <= block.timestamp) && (_end != 0))){
             _collectStream(msg.sender, _id, gets[msg.sender][_id]);
         }
         _editStream(_id, _emergencyClose, _end);
@@ -171,11 +171,10 @@ contract StreamPay is AccessControl{
         bool _emergencyClose,
         uint256 _end
     ) internal {
+        // update on chain data as to the ending of the stream
+        gets[msg.sender][_id].end = _end;
+        // just shut everything down
         if(_emergencyClose){
-            if((((_end >= block.timestamp) || (_end == 0)) && accountData[msg.sender].alive) &&
-                gets[msg.sender][_id].reserveIndex < maxIndex){
-                accountData[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
-            }
             // updates total payout rate
             accountData[msg.sender].totalCPS -= gets[msg.sender][_id].cps;
             // deletes it without the opportunity for the receiver to claim what ever they owe
@@ -183,10 +182,10 @@ contract StreamPay is AccessControl{
             emit streamClosed(msg.sender, _id);
             return;
         }
-        gets[msg.sender][_id].end = _end;
-        // updates the res stream data
-        if((_end >= block.timestamp) || (_end == 0)){
-            if(accountData[msg.sender].alive){
+        // If the stream closes clear up the reservations if that's applicable
+        if(_end <= block.timestamp){
+            if(accountData[msg.sender].alive &&
+                gets[msg.sender][_id].reserveIndex < maxIndex){
                 accountData[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
             }
             emit streamClosed(msg.sender, _id);
@@ -270,7 +269,7 @@ contract StreamPay is AccessControl{
 
         gets[_payer][_id].sinceLast += block.timestamp;
 
-        if(_stream.end <= block.timestamp){
+        if((_stream.end <= block.timestamp) && (_stream.end != 0)){
             // deletes stream if its to be closed
             _editStream(_id, true, 0);{
                 accountData[_payer].alive = false;
