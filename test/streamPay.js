@@ -78,8 +78,11 @@ describe("streamPay", function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamPay.createStream(
                 vars.addr1.address, 1, 0, now()-10, now()+10, []);
+
             expect(await (await vars.streamPay.accountData(vars.owner.address)).streams).to.equal(1);
+
             await vars.v2.setLimit(100000);
+
             await expect(vars.streamPay.editStream(0, false, now()-3))
                 .to.emit(vars.streamPay, 'streamClosed');
         });
@@ -211,6 +214,10 @@ describe("streamPay", function () {
 
             await vars.streamPay.streamPermGrant(vars.addr1.address, 0);
 
+            expect((await vars.streamPay.gets(
+                vars.owner.address, 0)).reserveIndex)
+                .to.equal(5);
+
             await vars.streamPay.connect(vars.addr1).collectStream(
                 vars.owner.address,
                 0);
@@ -268,11 +275,6 @@ describe("streamPay", function () {
             await vars.streamPay.startReservation(vars.owner.address);
             // reserve it
             await vars.streamPay.reserveStream(0, 1);
-            // checks to see if it all worked properly
-            expect(await (await vars.streamPay.accountData(vars.owner.address)).alive).to.equal(true);
-            await vars.streamPay.collectStream(
-                vars.owner.address,
-                0);
             // checks to see if it all worked properly
             expect(await (await vars.streamPay.accountData(vars.owner.address)).alive).to.equal(true);
             // un-reserve a stream

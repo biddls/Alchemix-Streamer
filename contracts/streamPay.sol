@@ -8,6 +8,8 @@ import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IcustomRouter} from "./interfaces/IcustomRouter.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SimpleSummedArrays} from "./SummedArrays/SimpleSummedArrays.sol";
+import "hardhat/console.sol";
+
 
 /// @title StreamPay
 /// @author Biddls
@@ -151,7 +153,7 @@ contract StreamPay is AccessControl{
     }
 
     /// @notice Allows the user to edit a streams end date
-    /// @dev This works from msg.sender so you cant do this on behalf of another address with out building something externaly
+    /// @dev This works from msg.sender so you cant do this on behalf of another address with out building something externally
     /// @param _id the ID of the stream
     /// @param _emergencyClose A bool that either allows for back pay or does not
     /// @param _end if back pay is allowed, until when?
@@ -161,34 +163,38 @@ contract StreamPay is AccessControl{
         uint256 _end
     ) public {
         if(_emergencyClose || ((_end <= block.timestamp) && (_end != 0))){
-            _collectStream(msg.sender, _id, gets[msg.sender][_id]);
+            _collectStream(msg.sender, _id, gets[msg.sender][_id], true);
         }
-        _editStream(_id, _emergencyClose, _end);
+        _editStream(_id, _emergencyClose, _end, address(0));
     }
 
+    /// @notice Internal version of edit stream that can skip the drawing down of funds (avoids infinite loop)
+    /// @dev This works from msg.sender so you cant do this on behalf of another address with out building something externally
+    /// @param _id the ID of the stream
+    /// @param _emergencyClose A bool that either allows for back pay or does not
+    /// @param _end if back pay is allowed, until when?
     function _editStream(
         uint256 _id, // the ID of the stream
         bool _emergencyClose,
-        uint256 _end
+        uint256 _end,
+        address forOverride
     ) internal {
+        forOverride = forOverride == address(0) ? msg.sender : forOverride;
         // update on chain data as to the ending of the stream
-        gets[msg.sender][_id].end = _end;
+        gets[forOverride][_id].end = _end;
         // just shut everything down
-        if(_emergencyClose){
-            // updates total payout rate
-            accountData[msg.sender].totalCPS -= gets[msg.sender][_id].cps;
-            // deletes it without the opportunity for the receiver to claim what ever they owe
-            delete gets[msg.sender][_id];
-            emit streamClosed(msg.sender, _id);
-            return;
-        }
         // If the stream closes clear up the reservations if that's applicable
-        if(_end <= block.timestamp){
-            if(accountData[msg.sender].alive &&
-                gets[msg.sender][_id].reserveIndex < maxIndex){
-                accountData[msg.sender].reservedList.clear(gets[msg.sender][_id].reserveIndex);
+        if(_emergencyClose || ((_end <= block.timestamp) && (_end != 0))){
+            // if the reservation index actually means its reserved
+            if(gets[forOverride][_id].reserveIndex < maxIndex){
+                accountData[msg.sender].reservedList.clear(gets[forOverride][_id].reserveIndex);
             }
-            emit streamClosed(msg.sender, _id);
+            // updates total payout rate
+            accountData[forOverride].totalCPS -= gets[forOverride][_id].cps;
+            // deletes it without the opportunity for the receiver to claim what ever they owe
+            delete gets[forOverride][_id];
+            emit streamClosed(forOverride, _id);
+            return;
         }
     }
 
@@ -216,24 +222,19 @@ contract StreamPay is AccessControl{
         }
     }
 
-    function clearReservedStream (
-        address _account,
-        uint8 _index
-    ) internal {
-        require(accountData[_account].alive, "Account not setup for reservations");
-        accountData[_account].reservedList.clear(_index);
-    }
-
     /// @notice Allows an approved address to collect a stream
     /// @param _payer the address that gives
     /// @param _id the ID of the stream
     function collectStream(
         address _payer,
         uint256 _id
-    ) external returns (bool success){
+    ) external{
+        // stores local version of data to save gas
         Stream memory _stream = gets[_payer][_id];
+        // ensuring that the address calling has the right to do so
         require(hasRole(genRole(_payer, _id, _stream), msg.sender), "addr dont have access");
-        success = _collectStream(_payer, _id, _stream);
+        // calls the internal unchecked version of collectStream
+        _collectStream(_payer, _id, _stream, false);
     }
 
     /// @dev internal function
@@ -242,8 +243,9 @@ contract StreamPay is AccessControl{
     function _collectStream(
         address _payer,
         uint256 _id,
-        Stream memory _stream
-    ) internal returns (bool success){
+        Stream memory _stream,
+        bool recursion
+    ) internal {
         // returns how much its asking for
         uint256 _amount;
         // reserved streams management
@@ -263,17 +265,17 @@ contract StreamPay is AccessControl{
             _stream.route.length > 0 ? _stream.route[0] : _stream.payee
         );
 
+        // updates the since last data if the draw down of funds from alc was successful
         if(_stream.reserveIndex < maxIndex){
             accountData[_payer].reservedList.updateSinceLast(_stream.reserveIndex);
         }
 
-        gets[_payer][_id].sinceLast += block.timestamp;
-
-        if((_stream.end <= block.timestamp) && (_stream.end != 0)){
+        // updates on chain data
+        gets[_payer][_id].sinceLast = block.timestamp;
+        // if the stream has ended delete it
+        if(!recursion && (_stream.end <= block.timestamp)){
             // deletes stream if its to be closed
-            _editStream(_id, true, 0);{
-                accountData[_payer].alive = false;
-            }
+            _editStream(_id, true, 0, _payer);
         }
 
         if(_stream.route.length > 0){
@@ -294,10 +296,10 @@ contract StreamPay is AccessControl{
                 _stream.route,
                 1);
 
+            // ensures that the funds have moved on
             require(0 == IERC20(coinAddress).balanceOf(_stream.route[0]), "Coins did not move on");
         }
-        emit streamCollected(_payer, _amount, calcTotalPayOut(msg.sender, _id));
-        return success;
+        emit streamCollected(_payer, _amount);
     }
 
     /// @notice view function to tell it how much it will receive for a given address and ID of stream
@@ -395,10 +397,10 @@ contract StreamPay is AccessControl{
     function unReserveStream(
         uint256 _id,
         uint8 _priority
-    ) external{
+    ) external {
         require(accountData[msg.sender].alive, "Account not setup for reservations");
         // make sure the stream is alive
-        require(gets[msg.sender][_id].cps != 0);
+        require(gets[msg.sender][_id].cps != 0, "stream must be alive");
         // clear data currently held
         accountData[msg.sender].reservedList.clear(_priority);
     }
@@ -437,11 +439,12 @@ contract StreamPay is AccessControl{
             gets[msg.sender][_id2].reserveIndex);
     }
 
-    function setMaxIndex(
-        uint8 _max
-    ) external adminOnly {
-        maxIndex = _max;
-    }
+    /// cant have this because it breaks a bunch of stuff atm
+//    function setMaxIndex(
+//        uint8 _max
+//    ) external adminOnly {
+//        maxIndex = _max;
+//    }
 
     /// @notice returns the total payout for the stream
     /// @dev returns max int (2**256-1) if it has no end
@@ -512,7 +515,6 @@ contract StreamPay is AccessControl{
 
     event streamCollected(
         address payer,
-        uint256 amount,
-        uint256 runwayLeft
+        uint256 amount
     );
 }

@@ -13,10 +13,6 @@ const testing = async function() {
     contract = await ethers.getContractFactory("StreamPay");
     const streamPay = await contract.deploy(5);
 
-    // streamer.changeAlcV2(addr1.address);
-    // streamer.setCoinAddress(addr2.address);
-    // streamer.changeAdmin(addr3.address);
-
     // deployer
     contract = await ethers.getContractFactory("Deployer");
     const deployer = await contract.deploy();
@@ -41,7 +37,7 @@ const testing = async function() {
         await v2.alAsset()// The deployed contract address
     );
 
-    // streamPay
+    // streamPayPro
     contract = await ethers.getContractFactory("StreamPayPro");
     const streamPayPro = await contract.deploy(streamPay.address);
 
