@@ -278,10 +278,5 @@ describe("streamPay", function () {
             // un-reserve a stream
             await vars.streamPay.unReserveStream(0, 1);
         });
-        it("checks around drawing down", async function () {
-
-        });
-        it("breaky breaky time", async function () {
-        });
     });
 });
