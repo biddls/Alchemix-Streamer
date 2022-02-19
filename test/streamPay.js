@@ -83,7 +83,7 @@ describe("streamPay", function () {
 
             await vars.v2.setLimit(100000);
 
-            await expect(vars.streamPay.editStream(0, false, now()-3))
+            await expect(vars.streamPay.closeStream(0, false, now()-5))
                 .to.emit(vars.streamPay, 'streamClosed');
         });
         it("extend stream", async function () {
@@ -94,7 +94,7 @@ describe("streamPay", function () {
 
             await vars.v2.setLimit(100000);
 
-            await expect(vars.streamPay.editStream(0, false, now()*2))
+            await expect(vars.streamPay.closeStream(0, false, now()*2))
                 .to.not.emit(vars.streamPay, 'streamClosed');
         });
         it("emergency close", async function () {
@@ -105,7 +105,7 @@ describe("streamPay", function () {
 
             await vars.v2.setLimit(100000);
 
-            await expect(vars.streamPay.editStream(0, true, 0))
+            await expect(vars.streamPay.closeStream(0, true, 0))
                 .to.emit(vars.streamPay, 'streamClosed');
         });
     });

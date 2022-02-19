@@ -27,9 +27,9 @@ contract SimpleSummedArrays{
     ) external adminsOnly maxSizeCheck(_nubIndex, false)
     returns (uint256 total) {
         require(block.timestamp > sinceLast);
-        uint256 now = block.timestamp;
+//        uint256 now = block.timestamp;
         for(uint16 i = 0; i <= _nubIndex; i++) {
-            total = total + ((now - sinceLastData[i]) * CPSData[i]);
+            total = total + ((block.timestamp - sinceLastData[i]) * CPSData[i]);
         }
         emit calcRes(total);
         return total;
@@ -89,10 +89,6 @@ contract SimpleSummedArrays{
     ) adminsOnly public {
         // should be the user account is admins[0]
         selfdestruct(payable(address(admins[0])));
-    }
-
-    function now() view external returns (uint256) {
-        return block.timestamp;
     }
 
     event calcRes(
