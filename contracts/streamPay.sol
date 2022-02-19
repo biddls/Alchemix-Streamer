@@ -16,8 +16,6 @@ import {SimpleSummedArrays} from "./SummedArrays/SimpleSummedArrays.sol";
 /// @notice Allows users to set up streams with custom contract routing
 /// @dev the lower feature version that requires more upkeep
 /// @dev this contract holds no funds
-// @pre_audit_checks: mby think about multiple different assets (1 asset type per stream)
-// @pre_audit_checks: Make StreamPay upgradeable
 contract StreamPay is AccessControl{
 
     /// @dev mapping from => ID => stream
@@ -25,6 +23,15 @@ contract StreamPay is AccessControl{
 
     /// @dev mapping address => account data
     mapping(address => Account) public accountData;
+
+    /// @dev holds the data for each alAsset that can be used with with contract
+    mapping(uint8 => Coin) public coinData;
+
+    /// @dev route admin role
+    bytes32 public constant ROUTE_ADMIN = "RouterDaddy";
+
+    /// @dev holds admin permitted routing options for users
+    mapping(uint256 => address[]) public routes;
 
     /// @dev maximum search distance
     uint8 public maxIndex;
@@ -42,12 +49,14 @@ contract StreamPay is AccessControl{
         /// @dev unix time marking the end of the stream (can be set to 0 to never end)
         uint256 end;
         /// reentrancy security issues
-        /// @dev allows for a "route" of contracts to be immutably defined if no route is given it skips this step
-        address[] route;
         /// @dev a role is generated which allows the owner to permission addresses to call collect the stream function
         bytes32 ROLE;
+        /// @dev allows for a "route" of contracts to be immutably defined if no route is given it skips this step
+        uint8 routeIndex;
         /// @dev denotes if this stream is a reserved stream or not
         uint8 reserveIndex;
+        /// @dev denotes the index of the coin this stream handles
+        uint8 coinIndex;
     }
 
     /// @dev Struct that holds all the data about a reserved stream
@@ -57,9 +66,16 @@ contract StreamPay is AccessControl{
         /// @dev tells the contract if the mapping is empty
         bool alive;
         /// @dev current payout rate
-        uint256 totalCPS;
+        mapping(uint8 => uint256) totalCPS;
         /// @dev number of streams that have ever been started
         uint256 streams;
+    }
+
+    // holds the address of a coin and the corresponding alc V2 vault
+    struct Coin{
+        IalcV2Vault alcV2vault;
+        IERC20 alAsset;
+        bool valid;
     }
 
     // @audit have all the info here so its harder to test something when you cant see it
@@ -76,46 +92,6 @@ contract StreamPay is AccessControl{
         maxIndex = _maxIndex;
     }
 
-    // @pre_audit_checks do we need these 3?
-    /// @notice Admin only function to change the stored address of alc V2
-    /// @dev Admin only cannot pass in 0 address
-    /// @param _new The new address of alcV2
-    function changeAlcV2(address _new) external adminOnly {
-        // cant set it to 0 address
-        require(_new != address(0));
-        // sets new address
-        adrAlcV2 = _new;
-//         //updates the vault cont
-//        vault = IalcV2Vault(_new);
-        // emits an update
-        emit changedAlcV2(_new);
-    }
-
-    /// @notice Changes the address of the erc-20 token it gets from the vault
-    /// @dev Admin only cannot pass in 0 address
-    /// @param _new The new address of the alAsset coin
-    function setCoinAddress(address _new) external adminOnly {
-        // the 0 address isnt a contract
-        require(_new != address(0));
-        // sets the address of the erc-20 token
-        coinAddress = _new;
-        // emits a call
-        emit coinAddressChanged(_new);
-    }
-
-    /// @notice Changes the address of the admin
-    /// @dev Admin only cannot pass in 0 address
-    /// @param _new The new address of admin
-    function changeAdmin(address _new) external adminOnly {
-        // the 0 address isnt a contract
-        require(_new != address(0));
-        // sets the address of the admin
-        grantRole(DEFAULT_ADMIN_ROLE, _new);
-        revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        // emits a call
-        emit adminChanged(_new);
-    }
-
     /// @notice Allows the user to create a stream
     /// @dev This works from msg.sender so you cant do this on behalf of another address with out building something externaly
     /// @param _to the address of the receiver
@@ -123,17 +99,17 @@ contract StreamPay is AccessControl{
     /// @param _freq the unix time of last withdrawal
     /// @param _start how often can they withdraw so 1 once a week would be 604800 (can be set to 0 to act more like a sabiler stream)
     /// @param _end unix time marking the end of the stream (can be set to 0 to never end)
-    /// @param _route allows for a "route" of contracts to be immutably defined if no route is given it skips this step
+    /// @param _routeIndex allows for a "route" of contracts to be immutably defined if no route is given it skips this step
+    /// @param _coinIndex allows for the user to select what coin they are streaming
     function createStream(
-    // todo add in the ability for a StreamPay to handle multiple coin types for any alcV2 vault
         address _to, // the payee
         uint256 _cps, // coins per second
         uint256 _freq, // uinx time
         uint256 _start, // unix time for it to start the stream on
     /// this ^ can allow the creation of back pay or to start the stream next saturday
         uint256 _end, // 0 means no end
-        address[] memory _route
-    // todo needs to use a whitelisting feature in code with a data base contract
+        uint8 _routeIndex,
+        uint8 _coinIndex
     ) external {
         /// duh you should not send money to 0 address
         require(_to != address(0), "cannot stream to 0 address");
@@ -142,20 +118,21 @@ contract StreamPay is AccessControl{
         /// cant end before _start
         require(_end == 0 || _end > _start, "Cant end before you have started, unless it never ends");
         /// gets the next stream ID number
-        uint256 _nextID = accountData[msg.sender].streams;
+        uint256 _streamID = accountData[msg.sender].streams;
+        // makes sure that it is something an admin has submitted
+        require(coinData[_coinIndex].valid);
         // fills in the database about the stream
-        gets[msg.sender][_nextID] = Stream(_to, _cps, _start, _freq, _end, _route, "", maxIndex);
+        gets[msg.sender][_streamID] = Stream(_to, _cps, _start, _freq, _end, "", _routeIndex, maxIndex, _coinIndex);
         // updates counter for total CPS payout
-        accountData[msg.sender].totalCPS += _cps;
+        accountData[msg.sender].totalCPS[_coinIndex] += _cps;
         // sets the role string that represents the role
-        gets[msg.sender][_nextID].ROLE = genRole(msg.sender, _nextID, gets[msg.sender][_nextID]);
+        gets[msg.sender][_streamID].ROLE = genRole(msg.sender, _streamID, gets[msg.sender][_streamID]);
         // sets the correct permissions for the stream
-        grantRole(gets[msg.sender][_nextID].ROLE, msg.sender);
+        grantRole(gets[msg.sender][_streamID].ROLE, msg.sender);
         /// increments the number of streams from that address (starting from a 0)
         accountData[msg.sender].streams++;
-        require(accountData[msg.sender].streams > 0);
         // emmit events
-        emit streamStarted(msg.sender, _nextID, _to);
+        emit streamStarted(msg.sender, _streamID, _to);
     }
 
     /// @notice Allows the user to edit a streams end date
@@ -189,7 +166,7 @@ contract StreamPay is AccessControl{
                 accountData[msg.sender].reservedList.clear(gets[forOverride][_id].reserveIndex);
             }
             // updates total payout rate
-            accountData[forOverride].totalCPS -= gets[forOverride][_id].cps;
+            accountData[forOverride].totalCPS[gets[forOverride][_id].coinIndex] -= gets[forOverride][_id].cps;
             delete gets[forOverride][_id];
             emit streamClosed(forOverride, _id);
             return;
@@ -228,6 +205,8 @@ contract StreamPay is AccessControl{
         Stream memory _stream,
         bool recursion
     ) internal {
+        // loads the data out of storage and into memory
+        Coin memory coin = coinData[_stream.coinIndex];
         // returns how much its asking for
         uint256 _amount;
         // reserved streams management
@@ -240,11 +219,11 @@ contract StreamPay is AccessControl{
         }
         // if it is not a custom contract
         // calls the borrow function in V2
-        IalcV2Vault(adrAlcV2).mintFrom( // <- TODO integration with V2
+        IalcV2Vault(coin.alcV2vault).mintFrom( // <- TODO integration with V2
             _payer,
             _amount,
         // this either sends the funds to the 1st custom cont or payee depending on if there is a route or not
-            _stream.route.length > 0 ? _stream.route[0] : _stream.payee
+            routes[_stream.routeIndex].length > 0 ? routes[_stream.routeIndex][0] : _stream.payee
         );
 
         // updates the since last data if the draw down of funds from alc was successful
@@ -260,7 +239,7 @@ contract StreamPay is AccessControl{
             _closeStream(_id, true, 0, _payer);
         }
 
-        if(_stream.route.length > 0){
+        if(routes[_stream.routeIndex].length > 0){
             /*
             if it is a custom contract
             this allows for people to route funds though custom contracts
@@ -271,16 +250,18 @@ contract StreamPay is AccessControl{
             mby no risk of reentrancy as nothing else in the
             contract after this relies on the contracts own internal state
             */
-            IcustomRouter(_stream.route[0]).route(
-                coinAddress, // alusd
+            // todo: need to re-write docs on this and example code
+            IcustomRouter(routes[_stream.routeIndex][0]).route(
+                coin.alAsset, // alusd
                 _stream.payee, // end reciver
                 _amount, // amount of alUSd its passing on
-                _stream.route, // the list of contrants the funds move through
+            // todo: mby change this to the index but am not sure
+                routes[_stream.routeIndex], // the list of contrants the funds move through
                 1 // next index to look at
             );
 
             // ensures that the funds have moved on
-            require(0 == IERC20(coinAddress).balanceOf(_stream.route[0]), "Coins did not move on");
+            require(0 == IERC20(coin.alAsset).balanceOf(routes[_stream.routeIndex][0]), "Coins did not move on");
         }
         emit streamCollected(_payer, _amount);
     }
@@ -422,12 +403,27 @@ contract StreamPay is AccessControl{
             gets[msg.sender][_id2].reserveIndex);
     }
 
-/*    /// cant have this because it breaks a bunch of stuff atm
-//    function setMaxIndex(
-//        uint8 _max
-//    ) external adminOnly {
-//        maxIndex = _max;
-//    }*/
+    /// @dev allows the admin to approve new coins to be used with streamPay
+    /// @param _alcV2vault address of the alcVault
+    /// @param _alAsset address of the alAsset
+    /// @param _index of the new data
+    function setCoinIndex(IalcV2Vault _alcV2vault, IERC20 _alAsset, uint8 _index) external adminOnly {
+        // @pre_audit_checks mby do some interface checks?
+        require((address(_alcV2vault) != address(0)) && (address(_alAsset) != address(0)));
+        coinData[_index] = Coin(_alcV2vault, _alAsset, true);
+    }
+
+    /// @dev allows the admin to approve new coins to be used with streamPay
+    /// @param _route new route
+    /// @param _index index of the new
+    function setRouteIndex(address[] memory _route, uint256 _index) external {
+        // @pre_audit_checks mby do some interface checks?
+        require(hasRole(ROUTE_ADMIN, msg.sender), "router daddy only");
+        require(_index != 0, "cannot override the no route option");
+        // the only way you can edit a route is to kill it, reverting it back to its base state
+        require((routes[_index].length != 0) || (_route.length == 0), "cannot edit route");
+        routes[_index] = _route;
+    }
 
     /// @notice returns the total payout for the stream
     /// @dev returns max int (2**256-1) if it has no end
@@ -441,23 +437,25 @@ contract StreamPay is AccessControl{
         ((gets[_payer][_id].end - gets[_payer][_id].sinceLast) * gets[_payer][_id].cps);
     }
 
-    /// @notice returns the max amount of coins that can be borrowed - reserved coins etc
+    /// @notice returns some place holder data for use off chain
     /// @dev take this number and / by av daily returns
     /// @param _payer the address that is paying out the funds
     function calcRunwayLeft(
-        address _payer
+        address _payer,
+        uint8 _coinIndex
     ) external returns (uint256 _available, uint256 _totalCps){
         _available = calcEarMarked(
             _payer,
             maxIndex,
             0,
             true);
-        _totalCps = accountData[_payer].totalCPS;
+        _totalCps = accountData[_payer].totalCPS[_coinIndex];
     }
 
     /// makes account if there isn't one
     function startReservation(
-        address _account) external {
+        address _account
+    ) external {
         // makes sure to not duplicate the contract
         require(!accountData[_account].alive);
         // sets the admin addresses
@@ -467,13 +465,17 @@ contract StreamPay is AccessControl{
         accountData[_account].alive = true;
     }
 
+    function destroyStreamPay(
+        address payable _to
+    ) external adminOnly {
+        selfdestruct(_to);
+    }
+
     modifier adminOnly {
         // only admin address can call this (could be changed to the multisig or DAO)
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
         _;
     }
-
-    // @pre_audit_checks: modifier to enable or disable the whole contract
 
     event streamStarted (
         address indexed from,

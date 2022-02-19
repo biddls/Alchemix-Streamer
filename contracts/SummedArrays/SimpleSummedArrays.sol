@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-import {BitOps} from "../utils/BitOps.sol";
-
 contract SimpleSummedArrays{
 
     /// @dev unix time since last drawDown

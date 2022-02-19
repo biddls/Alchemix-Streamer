@@ -5,17 +5,13 @@ const testing = async function() {
     let [owner, addr1, addr2, addr3, ...addrs] = await ethers.getSigners();
     const balance = await owner.getBalance();
 
-    // testing stuff
-    let contract = await ethers.getContractFactory('BitOps')
-    const BitOps = await contract.deploy()
-
     // streamer
-    contract = await ethers.getContractFactory("StreamPay");
+    let contract = await ethers.getContractFactory("StreamPay");
     const streamPay = await contract.deploy(5);
 
-    // deployer
-    contract = await ethers.getContractFactory("Deployer");
-    const deployer = await contract.deploy();
+    // // deployer
+    // contract = await ethers.getContractFactory("Deployer");
+    // const deployer = await contract.deploy();
 
     //testing custom conts
     contract = await ethers.getContractFactory("Forward");
@@ -37,9 +33,6 @@ const testing = async function() {
         await v2.alAsset()// The deployed contract address
     );
 
-    // streamPayPro
-    contract = await ethers.getContractFactory("StreamPayPro");
-    const streamPayPro = await contract.deploy(streamPay.address);
 
     // setting stuff up to plug into one another
     // into V2
@@ -47,12 +40,10 @@ const testing = async function() {
 
     // into the alAsset
     streamPay.setCoinAddress(alAsset.address);
-    deployer.change_alAsset(alAsset.address);
 
     return {
         streamPay,
-        streamPayPro,
-        deployer,
+        // deployer,
         forward,
         forward2,
         forwardBroken,
@@ -86,28 +77,6 @@ const testingGeneral = async function(decimals) {
         addrs: addrs};
 }
 
-const testingSummedArrs = async function(_maxSteps) {
-    let [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
-    const balance = await owner.getBalance();
-
-    let Token = await ethers.getContractFactory('BitOps')
-    const BitOps = await Token.deploy()
-
-    Token = await ethers.getContractFactory('SummedArrays', {
-        libraries: {
-            BitOps: BitOps.address,
-        },
-    });
-
-    const summedArs = await Token.deploy(_maxSteps, [owner.address, addr1.address]);
-
-    return {balance,
-        summedArs,
-        owner,
-        addr1,
-        addr2,
-        addrs};
-}
 
 const testingSimpleSummedArrs = async function(_maxSteps) {
     let [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
@@ -128,6 +97,5 @@ const testingSimpleSummedArrs = async function(_maxSteps) {
 module.exports = {
     testing,
     testingGeneral,
-    testingSummedArrs,
     testingSimpleSummedArrs
 }
