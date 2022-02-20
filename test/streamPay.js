@@ -14,42 +14,17 @@ describe("streamPay", function () {
 
     describe("Token contract setup", async function () {
         it("Admin tooling tests", async function () {
-            // setting new addresses
-            await expect(vars.streamPay.changeAlcV2(vars.addr1.address))
-                .to.emit(vars.streamPay, 'changedAlcV2')
-                .withArgs(vars.addr1.address);
-            await expect(vars.streamPay.setCoinAddress(vars.addr2.address))
-                .to.emit(vars.streamPay, 'coinAddressChanged')
-                .withArgs(vars.addr2.address);
-
-            await expect(vars.streamPay.changeAdmin(vars.addr3.address))
-                .to.emit(vars.streamPay, 'adminChanged')
-                .withArgs(vars.addr3.address);
-
             // checking addresses
-            expect(await vars.streamPay.adrAlcV2()).to.equal(vars.addr1.address);
-            expect(await vars.streamPay.coinAddress()).to.equal(vars.addr2.address);
-
-            await expect(vars.streamPay.connect(vars.addr2).changeAlcV2(vars.addr1.address))
-                .to.be.revertedWith("admin only");
-            await expect(vars.streamPay.connect(vars.addr2).setCoinAddress(vars.addr2.address))
-                .to.be.revertedWith("admin only");
-            await expect(vars.streamPay.connect(vars.addr2).changeAdmin(vars.addr3.address))
-                .to.be.revertedWith("admin only");
-
-            await expect(vars.streamPay.connect(vars.addr3).changeAlcV2(zero_address))
-                .to.be.reverted;
-            await expect(vars.streamPay.connect(vars.addr3).setCoinAddress(zero_address))
-                .to.be.reverted;
-            await expect(vars.streamPay.connect(vars.addr3).changeAdmin(zero_address))
-                .to.be.reverted;
+            await expect((await vars.streamPay.coinData(0)).alcV2vault).to.equal(vars.v2.address);
+            await expect((await vars.streamPay.coinData(0)).alAsset).to.equal(vars.alAsset.address);
+            await expect((await vars.streamPay.coinData(0)).valid).to.equal(true);
         });
     });
     describe("Stream", async function () {
         it("Create stream", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, 0, 0, []);
+                vars.addr1.address, 1, 0, 0, 0, 0, 0);
             expect((await vars.streamPay.gets(
                 vars.owner.address, 0))[0])
                 .to.equal(vars.addr1.address);
@@ -65,19 +40,19 @@ describe("streamPay", function () {
         it("dont stream to 0 address", async function () {
             // v2 code here to get approval for the contract to draw down
             await expect(vars.streamPay.createStream(
-                zero_address,1,  0, 0, 0, [])).to.be.revertedWith("cannot stream to 0 address");
+                zero_address,1,  0, 0, 0, 0, 0)).to.be.revertedWith("cannot stream to 0 address");
         });
         it("streams CPS > 0", async function () {
             // v2 code here to get approval for the contract to draw down
             await expect(vars.streamPay.createStream(
-                vars.addr1.address,0,  0, 0, 0, [])).to.be.revertedWith("should not stream 0 coins");
+                vars.addr1.address,0,  0, 0, 0, 0, 0)).to.be.revertedWith("should not stream 0 coins");
         });
     });
     describe("edit stream", async function () {
         it("nice close", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, now()-10, now()+10, []);
+                vars.addr1.address, 1, 0, now()-10, now()+10, 0, 0);
 
             expect(await (await vars.streamPay.accountData(vars.owner.address)).streams).to.equal(1);
 
@@ -89,7 +64,7 @@ describe("streamPay", function () {
         it("extend stream", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, now()-10, now()+10, []);
+                vars.addr1.address, 1, 0, now()-10, now()+10, 0, 0);
             expect(await (await vars.streamPay.accountData(vars.owner.address)).streams).to.equal(1);
 
             await vars.v2.setLimit(100000);
@@ -100,7 +75,7 @@ describe("streamPay", function () {
         it("emergency close", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, now()-10, now()+10, []);
+                vars.addr1.address, 1, 0, now()-10, now()+10, 0, 0);
             expect(await (await vars.streamPay.accountData(vars.owner.address)).streams).to.equal(1);
 
             await vars.v2.setLimit(100000);
@@ -113,7 +88,7 @@ describe("streamPay", function () {
         it("Normal drawing down", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamPay.createStream(
-                vars.addr1.address, 1000, 0, now()-10, now()+10, []);
+                vars.addr1.address, 1000, 0, now()-10, now()+10, 0, 0);
 
             await vars.v2.setLimit(100000);
 
@@ -124,7 +99,7 @@ describe("streamPay", function () {
         it("draw down too soon", async function () {
             // v2 code here to get approval for the contract to draw down
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, now()-10, now()*10000, []);
+                vars.addr1.address, 1, 0, now()-10, now()*10000, 0, 0);
 
             await vars.streamPay.streamSize(
                 vars.owner.address,
@@ -133,8 +108,9 @@ describe("streamPay", function () {
     });
     describe("custom contract interactions", async function () {
         it("basic forwarding contract", async function () {
+            await vars.streamPay.setRouteIndex([vars.forward.address], 1);
             await vars.streamPay.createStream(
-                vars.addr1.address,1,  0, now(), now() + 1, [vars.forward.address]);
+                vars.addr1.address,1,  0, now(), now() + 1, 0, 0);
 
             await vars.v2.setLimit(100);
 
@@ -143,8 +119,9 @@ describe("streamPay", function () {
                 0);
         });
         it("multi forwarding contract", async function () {
+            await vars.streamPay.setRouteIndex([vars.forward.address, vars.forward2.address], 2);
             await vars.streamPay.createStream(
-                vars.addr1.address,1,  0, now(), now() + 1, [vars.forward.address, vars.forward2.address]);
+                vars.addr1.address,1,  0, now(), now() + 1, 2, 0);
 
             await vars.v2.setLimit(100);
 
@@ -153,8 +130,9 @@ describe("streamPay", function () {
                 0);
         });
         it("multi forwarding contract recursive", async function () {
+            await vars.streamPay.setRouteIndex([vars.forward.address, vars.forward.address], 2);
             await vars.streamPay.createStream(
-                vars.addr1.address,1,  0, now(), now() + 1, [vars.forward.address, vars.forward.address]);
+                vars.addr1.address,1,  0, now(), now() + 1, 2, 0);
 
             await vars.v2.setLimit(100);
 
@@ -163,8 +141,9 @@ describe("streamPay", function () {
                 0)).to.be.revertedWith("Cannot route to self");
         });
         it("basic broken forwarding contract", async function () {
+            await vars.streamPay.setRouteIndex([vars.forwardBroken.address], 2);
             await vars.streamPay.createStream(
-                vars.addr1.address,1,  0, now(), now() + 1, [vars.forwardBroken.address]);
+                vars.addr1.address,1,  0, now(), now() + 1, 2, 0);
 
             await vars.v2.setLimit(100);
 
@@ -173,8 +152,9 @@ describe("streamPay", function () {
                 0)).to.be.revertedWith("Coins did not move on");
         });
         it("all this one does is revert", async function () {
+            await vars.streamPay.setRouteIndex([vars.reverts.address], 2);
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, now(), now() + 1, [vars.reverts.address]);
+                vars.addr1.address, 1, 0, now(), now() + 1, 2, 0);
 
             await vars.v2.setLimit(100);
 
@@ -186,7 +166,7 @@ describe("streamPay", function () {
     describe("V2", async function () {
         it("got enough funds",async function () {
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, now(), now() + 1, []);
+                vars.addr1.address, 1, 0, now(), now() + 1, 0, 0);
 
             await vars.v2.setLimit(100);
 
@@ -196,7 +176,7 @@ describe("streamPay", function () {
         });
         it("not enough funds", async function () {
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, now(), now() + 1, []);
+                vars.addr1.address, 1, 0, now(), now() + 1, 0, 0);
 
             await vars.v2.setLimit(0);
 
@@ -208,7 +188,7 @@ describe("streamPay", function () {
     describe("stream role changing", async function () {
         it("streamPermGrant",async function () {
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, now(), now() + 1, []);
+                vars.addr1.address, 1, 0, now(), now() + 1, 0, 0);
 
             await vars.v2.setLimit(10);
 
@@ -224,7 +204,7 @@ describe("streamPay", function () {
         });
         it("streamPermRevoke", async function () {
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, now(), now() + 1, []);
+                vars.addr1.address, 1, 0, now(), now() + 1, 0, 0);
 
             await vars.v2.setLimit(10);
 
@@ -237,7 +217,7 @@ describe("streamPay", function () {
         });
         it("streamPermRevoke no right", async function () {
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, now(), now() + 1, []);
+                vars.addr1.address, 1, 0, now(), now() + 1, 0, 0);
 
             await expect (vars.streamPay.connect(vars.addr1).streamPermGrant(
                 vars.addr1.address, 0)).to.be.revertedWith("Stream owner must always have access");
@@ -247,7 +227,7 @@ describe("streamPay", function () {
         it("Reserve a stream", async function () {
             // create stream
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, 0, 0, []);
+                vars.addr1.address, 1, 0, 0, 0, 0, 0);
             await vars.streamPay.startReservation(vars.owner.address);
             // reserve it
             await vars.streamPay.reserveStream(0, 0);
@@ -271,7 +251,7 @@ describe("streamPay", function () {
         it("remove stream from being reserved", async function () {
             // create stream
             await vars.streamPay.createStream(
-                vars.addr1.address, 1, 0, 0, 0, []);
+                vars.addr1.address, 1, 0, 0, 0, 0, 0);
             await vars.streamPay.startReservation(vars.owner.address);
             // reserve it
             await vars.streamPay.reserveStream(0, 1);

@@ -34,12 +34,10 @@ const testing = async function() {
     );
 
 
-    // setting stuff up to plug into one another
+    // getting stuff up to plug into one another
     // into V2
-    streamPay.changeAlcV2(v2.address);
-
-    // into the alAsset
-    streamPay.setCoinAddress(alAsset.address);
+    streamPay.setCoinIndex(v2.address, alAsset.address, 0);
+    streamPay.grantRole(await streamPay.ROUTE_ADMIN(), owner.address);
 
     return {
         streamPay,

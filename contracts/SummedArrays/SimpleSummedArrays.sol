@@ -89,6 +89,10 @@ contract SimpleSummedArrays{
         selfdestruct(payable(address(admins[0])));
     }
 
+    function now() view external returns (uint256) {
+        return block.timestamp;
+    }
+
     event calcRes(
         uint256 amountReserved
     );

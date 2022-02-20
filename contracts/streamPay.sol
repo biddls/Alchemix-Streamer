@@ -78,14 +78,6 @@ contract StreamPay is AccessControl{
         bool valid;
     }
 
-    // @audit have all the info here so its harder to test something when you cant see it
-    /// @dev Alchemix vault V2 address
-    address public adrAlcV2;
-    /// IalcV2Vault public vault;
-
-    /// @dev address of erc-20 coin used alAsset (alUSD, alETH...)
-    address public coinAddress;
-
     /// @dev Sets up a basic admin role for upgrade-ability
     constructor (uint8 _maxIndex) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -212,7 +204,7 @@ contract StreamPay is AccessControl{
         // reserved streams management
         // sets how much can be drawn down
         if(accountData[_payer].alive) {
-            _amount = calcEarMarked(_payer, _stream.reserveIndex, 0, false);
+            _amount = calcEarMarked(_payer, _stream.reserveIndex, 0, false, coin.alcV2vault);
         } else {
             _amount = streamSize(_payer, _id);
             // updates values held in the SummedArrays
@@ -374,14 +366,15 @@ contract StreamPay is AccessControl{
         address _payer,
         uint8 _index, /*how many streams*/
         uint256 _asking,
-        bool _max
+        bool _max,
+        IalcV2Vault _v2Vault
     ) public returns (uint256 _canBorrow){
         // gets the amount of coins that have been reserved
         if(accountData[_payer].alive){
             _canBorrow = accountData[_payer].reservedList.calcReserved(_index);
         }
-        // local sotrage of variable to rediuce gas
-        uint256 _allowance = IalcV2Vault(adrAlcV2).allowance(_payer);
+        // local storage of variable to reduce gas
+        uint256 _allowance = _v2Vault.allowance(_payer);
         // avoids underflow
         _canBorrow = _allowance >= _canBorrow ? _allowance - _canBorrow : 0;
     }
@@ -421,7 +414,7 @@ contract StreamPay is AccessControl{
         require(hasRole(ROUTE_ADMIN, msg.sender), "router daddy only");
         require(_index != 0, "cannot override the no route option");
         // the only way you can edit a route is to kill it, reverting it back to its base state
-        require((routes[_index].length != 0) || (_route.length == 0), "cannot edit route");
+        require((routes[_index].length == 0) || (_route.length == 0), "cannot edit route");
         routes[_index] = _route;
     }
 
@@ -442,13 +435,15 @@ contract StreamPay is AccessControl{
     /// @param _payer the address that is paying out the funds
     function calcRunwayLeft(
         address _payer,
-        uint8 _coinIndex
+        uint8 _coinIndex,
+        IalcV2Vault _v2Vault
     ) external returns (uint256 _available, uint256 _totalCps){
         _available = calcEarMarked(
             _payer,
             maxIndex,
             0,
-            true);
+            true,
+            _v2Vault);
         _totalCps = accountData[_payer].totalCPS[_coinIndex];
     }
 
