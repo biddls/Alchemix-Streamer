@@ -25,7 +25,6 @@ contract SimpleSummedArrays{
     ) external adminsOnly maxSizeCheck(_nubIndex, false)
     returns (uint256 total) {
         require(block.timestamp > sinceLast);
-//        uint256 now = block.timestamp;
         for(uint16 i = 0; i <= _nubIndex; i++) {
             total = total + ((block.timestamp - sinceLastData[i]) * CPSData[i]);
         }

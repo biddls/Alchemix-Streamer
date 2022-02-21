@@ -61,14 +61,14 @@ contract StreamPay is AccessControl{
 
     /// @dev Struct that holds all the data about a reserved stream
     struct Account {
-        /// @dev total above it summed: cps
-        SimpleSummedArrays reservedList;
         /// @dev tells the contract if the mapping is empty
         bool alive;
         /// @dev current payout rate
         mapping(uint8 => uint256) totalCPS;
         /// @dev number of streams that have ever been started
         uint256 streams;
+        /// @dev reservation system ordering
+        mapping(uint8 => mapping(uint8 => uint256)) reservationData;
     }
 
     // holds the address of a coin and the corresponding alc V2 vault
@@ -109,18 +109,32 @@ contract StreamPay is AccessControl{
         require(_cps > 0, "should not stream 0 coins");
         /// cant end before _start
         require(_end == 0 || _end > _start, "Cant end before you have started, unless it never ends");
-        /// gets the next stream ID number
-        uint256 _streamID = accountData[msg.sender].streams;
         // makes sure that it is something an admin has submitted
         require(coinData[_coinIndex].valid);
+        /// gets the next stream ID number
+        uint256 _streamID = accountData[msg.sender].streams;
         // fills in the database about the stream
-        gets[msg.sender][_streamID] = Stream(_to, _cps, _start, _freq, _end, "", _routeIndex, maxIndex, _coinIndex);
+        gets[msg.sender][_streamID] = Stream(
+            _to,
+            _cps,
+            _start,
+            _freq,
+            _end,
+            "",
+            _routeIndex,
+            maxIndex,
+            _coinIndex);
         // updates counter for total CPS payout
         accountData[msg.sender].totalCPS[_coinIndex] += _cps;
         // sets the role string that represents the role
-        gets[msg.sender][_streamID].ROLE = genRole(msg.sender, _streamID, gets[msg.sender][_streamID]);
+        gets[msg.sender][_streamID].ROLE = genRole(
+            msg.sender,
+            _streamID,
+            gets[msg.sender][_streamID]);
         // sets the correct permissions for the stream
-        grantRole(gets[msg.sender][_streamID].ROLE, msg.sender);
+        grantRole(
+            gets[msg.sender][_streamID].ROLE,
+            msg.sender);
         /// increments the number of streams from that address (starting from a 0)
         accountData[msg.sender].streams++;
         // emmit events
@@ -149,27 +163,25 @@ contract StreamPay is AccessControl{
         uint256 _id, // the ID of the stream
         bool _emergencyClose, // close the stream and do not allow collection from the stream
         uint256 _end, // new end data
-        address forOverride // allows internal overriding of the msg.sender var
+        address _account // allows internal overriding of the msg.sender var
     ) internal {
+        Stream memory _stream = gets[_account][_id];
+        // deletes it without the opportunity for the receiver to claim what ever they owe
         if(_emergencyClose){
-            // deletes it without the opportunity for the receiver to claim what ever they owe
-            // if the reservation index actually means its reserved
-            if(gets[forOverride][_id].reserveIndex < maxIndex){
-                accountData[msg.sender].reservedList.clear(gets[forOverride][_id].reserveIndex);
-            }
+            delete accountData[msg.sender].reservationData[_stream.reserveIndex][_stream.coinIndex];
             // updates total payout rate
-            accountData[forOverride].totalCPS[gets[forOverride][_id].coinIndex] -= gets[forOverride][_id].cps;
-            delete gets[forOverride][_id];
-            emit streamClosed(forOverride, _id);
+            accountData[_account].totalCPS[_stream.coinIndex] -= _stream.cps;
+            delete gets[_account][_id];
+            emit streamClosed(_account, _id);
             return;
-        } else if(gets[forOverride][_id].end == 0){
+        } else if(_stream.end == 0){
             // if there was no close date not there is
-            gets[forOverride][_id].end = _end;
+            gets[_account][_id].end = _end;
             return;
-        } else if (_end <= gets[forOverride][_id].end){
+        } else if (_end <= _stream.end){
             // if there was a close date it enforces that its closer to present
-            gets[forOverride][_id].end = _end;
-            emit streamClosed(forOverride, _id);
+            gets[_account][_id].end = _end;
+            emit streamClosed(_account, _id);
         }
     }
 
@@ -179,7 +191,7 @@ contract StreamPay is AccessControl{
     function collectStream(
         address _payer,
         uint256 _id
-    ) external{
+    ) external {
         // stores local version of data to save gas
         Stream memory _stream = gets[_payer][_id];
         // ensuring that the address calling has the right to do so
@@ -203,11 +215,11 @@ contract StreamPay is AccessControl{
         uint256 _amount;
         // reserved streams management
         // sets how much can be drawn down
+        // todo: fix and update this
         if(accountData[_payer].alive) {
             _amount = calcEarMarked(_payer, _stream.reserveIndex, 0, false, coin.alcV2vault);
         } else {
             _amount = streamSize(_payer, _id);
-            // updates values held in the SummedArrays
         }
         // if it is not a custom contract
         // calls the borrow function in V2
@@ -218,17 +230,13 @@ contract StreamPay is AccessControl{
             routes[_stream.routeIndex].length > 0 ? routes[_stream.routeIndex][0] : _stream.payee
         );
 
-        // updates the since last data if the draw down of funds from alc was successful
-        if(_stream.reserveIndex < maxIndex){
-            accountData[_payer].reservedList.updateSinceLast(_stream.reserveIndex);
-        }
-
-        // updates on chain data
-        gets[_payer][_id].sinceLast = block.timestamp;
         // if the stream has ended delete it
         if(!recursion && (_stream.end <= block.timestamp)){
             // deletes stream if its to be closed
             _closeStream(_id, true, 0, _payer);
+        } else {
+            // updates on chain data
+            gets[_payer][_id].sinceLast = block.timestamp;
         }
 
         if(routes[_stream.routeIndex].length > 0){
@@ -331,19 +339,11 @@ contract StreamPay is AccessControl{
         uint256 _id,
         uint8 _priority
     ) external{
-        require(accountData[msg.sender].alive, "Account not setup for reservations");
+        require(accountData[msg.sender].alive, "Account not currently doing reservations");
         // make sure the stream is alive
         require(gets[msg.sender][_id].cps != 0);
         // clear data currently held
-        accountData[msg.sender].reservedList.clear(_priority);
-        // writes over the same data location that was just cleared
-        accountData[msg.sender].reservedList.write(
-            _priority,
-            gets[msg.sender][_id].cps,
-            0,
-            gets[msg.sender][_id].sinceLast);
-        // updates local storage
-//        resRevGets[msg.sender][_priority] = _id;
+        accountData[msg.sender].reservationData[_priority][gets[msg.sender][_id].coinIndex] = _id;
     }
 
     /// @notice allows the user to un-reserve a stream
@@ -355,10 +355,10 @@ contract StreamPay is AccessControl{
         uint8 _priority
     ) external {
         require(accountData[msg.sender].alive, "Account not setup for reservations");
-        // make sure the stream is alive
-        require(gets[msg.sender][_id].cps != 0, "stream must be alive");
+//        // make sure the stream is alive
+//        require(gets[msg.sender][_id].cps != 0, "stream must be alive");
         // clear data currently held
-        accountData[msg.sender].reservedList.clear(_priority);
+        delete accountData[msg.sender].reservationData[_priority][gets[msg.sender][_id].coinIndex];
     }
 
     /// @notice gets how much is already reserved and says if an amount is possible or not
@@ -371,7 +371,8 @@ contract StreamPay is AccessControl{
     ) public returns (uint256 _canBorrow){
         // gets the amount of coins that have been reserved
         if(accountData[_payer].alive){
-            _canBorrow = accountData[_payer].reservedList.calcReserved(_index);
+            // todo: fix (steal code from simpleSummedArrs)
+            _canBorrow = 0;
         }
         // local storage of variable to reduce gas
         uint256 _allowance = _v2Vault.allowance(_payer);
@@ -384,23 +385,40 @@ contract StreamPay is AccessControl{
     /// @param _id2 the id of the 2nd stream
     function swapResStreams(
         uint256 _id1,
-        uint256 _id2
+        uint256 _id2,
+        uint8 _resIndex1,
+        uint8 _resIndex2,
+        uint8 _coinIndex
     ) external {
         require(accountData[msg.sender].alive);
+        require(coinData[_coinIndex].valid);
         // ensures proper ordering of data
-        require(gets[msg.sender][_id1].reserveIndex > maxIndex);
-        require(gets[msg.sender][_id2].reserveIndex > maxIndex);
+        require(gets[msg.sender][_id1].reserveIndex < maxIndex);
+        require(gets[msg.sender][_id2].reserveIndex < maxIndex);
+        // makes sure that they share the coin type
+        require(gets[msg.sender][_id1].coinIndex == gets[msg.sender][_id2].coinIndex);
+        // makes sure that the data lines up
+        require(
+            (accountData[msg.sender].reservationData[_resIndex1][_coinIndex] ==
+            gets[msg.sender][_id1].reserveIndex) &&
+            (accountData[msg.sender].reservationData[_resIndex2][_coinIndex] ==
+            gets[msg.sender][_id2].reserveIndex));
         // performs the swap
-        accountData[msg.sender].reservedList.swap(
-            gets[msg.sender][_id1].reserveIndex,
-            gets[msg.sender][_id2].reserveIndex);
+        accountData[msg.sender].reservationData[_resIndex1][_coinIndex] = _id2;
+        accountData[msg.sender].reservationData[_resIndex2][_coinIndex] = _id1;
+        gets[msg.sender][_id1].reserveIndex = _resIndex2;
+        gets[msg.sender][_id2].reserveIndex = _resIndex1;
     }
 
     /// @dev allows the admin to approve new coins to be used with streamPay
     /// @param _alcV2vault address of the alcVault
     /// @param _alAsset address of the alAsset
     /// @param _index of the new data
-    function setCoinIndex(IalcV2Vault _alcV2vault, IERC20 _alAsset, uint8 _index) external adminOnly {
+    function setCoinIndex(
+        IalcV2Vault _alcV2vault,
+        IERC20 _alAsset,
+        uint8 _index
+    ) external adminOnly {
         // @pre_audit_checks mby do some interface checks?
         require((address(_alcV2vault) != address(0)) && (address(_alAsset) != address(0)));
         coinData[_index] = Coin(_alcV2vault, _alAsset, true);
@@ -409,7 +427,10 @@ contract StreamPay is AccessControl{
     /// @dev allows the admin to approve new coins to be used with streamPay
     /// @param _route new route
     /// @param _index index of the new
-    function setRouteIndex(address[] memory _route, uint256 _index) external {
+    function setRouteIndex(
+        address[] memory _route,
+        uint256 _index
+    ) external {
         // @pre_audit_checks mby do some interface checks?
         require(hasRole(ROUTE_ADMIN, msg.sender), "router daddy only");
         require(_index != 0, "cannot override the no route option");
@@ -449,15 +470,9 @@ contract StreamPay is AccessControl{
 
     /// makes account if there isn't one
     function startReservation(
-        address _account
     ) external {
-        // makes sure to not duplicate the contract
-        require(!accountData[_account].alive);
-        // sets the admin addresses
-        address[2] memory tmp = [_account, address(this)];
-        // creates the contract and updates the on chain data to point to it
-        accountData[_account].reservedList = new SimpleSummedArrays(maxIndex, tmp);
-        accountData[_account].alive = true;
+        require(accountData[msg.sender].alive);
+        accountData[msg.sender].alive = true;
     }
 
     function destroyStreamPay(
