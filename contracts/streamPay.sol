@@ -10,6 +10,16 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SimpleSummedArrays} from "./SummedArrays/SimpleSummedArrays.sol";
 //import "hardhat/console.sol";
 
+//todo: take out routing system
+//todo: make sure events are working for everything
+//todo: look into errors instead of reverts
+//todo: remove comments between variables
+//todo: remove freq stuff
+//todo: new streams go to new ID and old one points to it
+//todo: receiver can add people to admin of stream
+//todo: receiver can add remove them self
+//todo: add view functions to make looking up easy
+
 
 /// @title StreamPay
 /// @author Biddls.eth
@@ -48,7 +58,6 @@ contract StreamPay is AccessControl{
         uint256 freq;
         /// @dev unix time marking the end of the stream (can be set to 0 to never end)
         uint256 end;
-        /// reentrancy security issues
         /// @dev a role is generated which allows the owner to permission addresses to call collect the stream function
         bytes32 ROLE;
         /// @dev allows for a "route" of contracts to be immutably defined if no route is given it skips this step
@@ -115,15 +124,16 @@ contract StreamPay is AccessControl{
         uint256 _streamID = accountData[msg.sender].streams;
         // fills in the database about the stream
         gets[msg.sender][_streamID] = Stream(
-            _to,
-            _cps,
-            _start,
-            _freq,
-            _end,
-            "",
-            _routeIndex,
-            maxIndex,
-            _coinIndex);
+            _to, // payee
+            _cps, // cps
+            _start, // sinceLast
+            _freq, // freq
+            _end, // end
+            "", // ROLE
+            _routeIndex, // routeIndex
+            maxIndex, // reserveIndex
+            _coinIndex // coinIndex
+        );
         // updates counter for total CPS payout
         accountData[msg.sender].totalCPS[_coinIndex] += _cps;
         // sets the role string that represents the role
@@ -138,7 +148,7 @@ contract StreamPay is AccessControl{
         /// increments the number of streams from that address (starting from a 0)
         accountData[msg.sender].streams++;
         // emmit events
-        emit streamStarted(msg.sender, _streamID, _to);
+        emit STREAM_STARTED(msg.sender, _streamID, _to);
     }
 
     /// @notice Allows the user to edit a streams end date
@@ -172,7 +182,7 @@ contract StreamPay is AccessControl{
             // updates total payout rate
             accountData[_account].totalCPS[_stream.coinIndex] -= _stream.cps;
             delete gets[_account][_id];
-            emit streamClosed(_account, _id);
+            emit STREAM_CLOSED(_account, _id);
             return;
         } else if(_stream.end == 0){
             // if there was no close date not there is
@@ -181,7 +191,7 @@ contract StreamPay is AccessControl{
         } else if (_end <= _stream.end){
             // if there was a close date it enforces that its closer to present
             gets[_account][_id].end = _end;
-            emit streamClosed(_account, _id);
+            emit STREAM_CLOSED(_account, _id);
         }
     }
 
@@ -263,7 +273,7 @@ contract StreamPay is AccessControl{
             // ensures that the funds have moved on
             require(0 == IERC20(coin.alAsset).balanceOf(routes[_stream.routeIndex][0]), "Coins did not move on");
         }
-        emit streamCollected(_payer, _amount);
+        emit STREAM_COLLECTED(_payer, _amount);
     }
 
     /// @notice view function to tell it how much it will receive for a given address and ID of stream
@@ -481,36 +491,40 @@ contract StreamPay is AccessControl{
         selfdestruct(_to);
     }
 
+    error AdminOnly(address account);
+
     modifier adminOnly {
         // only admin address can call this (could be changed to the multisig or DAO)
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "admin only");
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+            revert AdminOnly({account: msg.sender});
+        }
         _;
     }
 
-    event streamStarted (
+    event STREAM_STARTED (
         address indexed from,
         uint256 indexed ID,
         address indexed to
     );
 
-    event streamClosed (
+    event STREAM_CLOSED (
         address indexed from,
         uint256 indexed ID
     );
 
-    event changedAlcV2 (
+    event CHANGED_ALC_V2 (
         address indexed newAddr
     );
 
-    event coinAddressChanged (
+    event COIN_ADDR_CHANGED (
         address indexed newAddr
     );
 
-    event adminChanged (
+    event ADMIN_CHANGED (
         address indexed newAddr
     );
 
-    event streamCollected(
+    event STREAM_COLLECTED(
         address payer,
         uint256 amount
     );
