@@ -3,7 +3,7 @@ const { testingGeneral } = require("../script/testing.js");
 
 
 
-describe("Base External minter", function () {
+describe.skip("Base External minter", function () {
 
     let vars;
 

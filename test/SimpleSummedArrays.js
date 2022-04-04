@@ -6,7 +6,7 @@ async function onChainNow(a) {
     return await a.ssa.now();
 }
 
-describe("Simple Summed Arrays", function () {
+describe.skip("Simple Summed Arrays", function () {
 
     let vars;
 

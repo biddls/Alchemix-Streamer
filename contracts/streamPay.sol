@@ -20,7 +20,6 @@ import {SimpleSummedArrays} from "./SummedArrays/SimpleSummedArrays.sol";
 //todo: receiver can add remove them self
 //todo: add view functions to make looking up easy
 
-
 /// @title StreamPay
 /// @author Biddls.eth
 /// @notice Allows users to set up streams with custom contract routing
@@ -54,8 +53,6 @@ contract StreamPay is AccessControl{
         uint256 cps;
         /// @dev the unix time of last withdrawal
         uint256 sinceLast;
-        /// @dev how often can they withdraw so 1 once a week would be 604800 (can be set to 0 to act more like a sabiler stream)
-        uint256 freq;
         /// @dev unix time marking the end of the stream (can be set to 0 to never end)
         uint256 end;
         /// @dev a role is generated which allows the owner to permission addresses to call collect the stream function
@@ -97,7 +94,6 @@ contract StreamPay is AccessControl{
     /// @dev This works from msg.sender so you cant do this on behalf of another address with out building something externaly
     /// @param _to the address of the receiver
     /// @param _cps coins per second (in a granularity of 1/10^18 alUSD increments)
-    /// @param _freq the unix time of last withdrawal
     /// @param _start how often can they withdraw so 1 once a week would be 604800 (can be set to 0 to act more like a sabiler stream)
     /// @param _end unix time marking the end of the stream (can be set to 0 to never end)
     /// @param _routeIndex allows for a "route" of contracts to be immutably defined if no route is given it skips this step
@@ -105,7 +101,6 @@ contract StreamPay is AccessControl{
     function createStream(
         address _to, // the payee
         uint256 _cps, // coins per second
-        uint256 _freq, // uinx time
         uint256 _start, // unix time for it to start the stream on
     /// this ^ can allow the creation of back pay or to start the stream next saturday
         uint256 _end, // 0 means no end
@@ -127,7 +122,6 @@ contract StreamPay is AccessControl{
             _to, // payee
             _cps, // cps
             _start, // sinceLast
-            _freq, // freq
             _end, // end
             "", // ROLE
             _routeIndex, // routeIndex
@@ -287,11 +281,11 @@ contract StreamPay is AccessControl{
         Stream memory _stream = gets[_payer][_id];
         // if the stream has not closed or never closes
         if((_stream.end >= block.timestamp) || (_stream.end == 0)){
-            _amount = (_stream.freq + _stream.sinceLast) <= block.timestamp ?
+            _amount = _stream.sinceLast <= block.timestamp ?
             (block.timestamp - _stream.sinceLast) * _stream.cps : 0;
         } else {
             // if the stream is past its close by date
-            _amount = (_stream.freq + _stream.sinceLast) <= _stream.end ?
+            _amount = _stream.sinceLast <= _stream.end ?
             (_stream.end - _stream.sinceLast) * _stream.cps : 0;
         }
         return _amount;
@@ -338,7 +332,7 @@ contract StreamPay is AccessControl{
         uint256 _id,
         Stream memory _stream
     ) pure internal returns (bytes32 _ROLE){
-        return keccak256(abi.encodePacked(_from, _id, _stream.payee, _stream.cps, _stream.freq, _stream.end));
+        return keccak256(abi.encodePacked(_from, _id, _stream.payee, _stream.cps, _stream.end));
     }
 
     /// @notice allows the user to reserve a stream
