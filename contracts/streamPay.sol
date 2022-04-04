@@ -14,7 +14,6 @@ import {SimpleSummedArrays} from "./SummedArrays/SimpleSummedArrays.sol";
 //todo: make sure events are working for everything
 //todo: look into errors instead of reverts
 //todo: remove comments between variables
-//todo: remove freq stuff
 //todo: new streams go to new ID and old one points to it
 //todo: receiver can add people to admin of stream
 //todo: receiver can add remove them self
@@ -36,12 +35,6 @@ contract StreamPay is AccessControl{
     /// @dev holds the data for each alAsset that can be used with with contract
     mapping(uint8 => Coin) public coinData;
 
-    /// @dev route admin role
-    bytes32 public constant ROUTE_ADMIN = "RouterDaddy";
-
-    /// @dev holds admin permitted routing options for users
-    mapping(uint256 => address[]) public routes;
-
     /// @dev maximum search distance
     uint8 public maxIndex;
 
@@ -57,8 +50,6 @@ contract StreamPay is AccessControl{
         uint256 end;
         /// @dev a role is generated which allows the owner to permission addresses to call collect the stream function
         bytes32 ROLE;
-        /// @dev allows for a "route" of contracts to be immutably defined if no route is given it skips this step
-        uint8 routeIndex;
         /// @dev denotes if this stream is a reserved stream or not
         uint8 reserveIndex;
         /// @dev denotes the index of the coin this stream handles
@@ -96,7 +87,6 @@ contract StreamPay is AccessControl{
     /// @param _cps coins per second (in a granularity of 1/10^18 alUSD increments)
     /// @param _start how often can they withdraw so 1 once a week would be 604800 (can be set to 0 to act more like a sabiler stream)
     /// @param _end unix time marking the end of the stream (can be set to 0 to never end)
-    /// @param _routeIndex allows for a "route" of contracts to be immutably defined if no route is given it skips this step
     /// @param _coinIndex allows for the user to select what coin they are streaming
     function createStream(
         address _to, // the payee
@@ -104,7 +94,6 @@ contract StreamPay is AccessControl{
         uint256 _start, // unix time for it to start the stream on
     /// this ^ can allow the creation of back pay or to start the stream next saturday
         uint256 _end, // 0 means no end
-        uint8 _routeIndex,
         uint8 _coinIndex
     ) external {
         /// duh you should not send money to 0 address
@@ -124,7 +113,6 @@ contract StreamPay is AccessControl{
             _start, // sinceLast
             _end, // end
             "", // ROLE
-            _routeIndex, // routeIndex
             maxIndex, // reserveIndex
             _coinIndex // coinIndex
         );
@@ -231,7 +219,7 @@ contract StreamPay is AccessControl{
             _payer,
             _amount,
         // this either sends the funds to the 1st custom cont or payee depending on if there is a route or not
-            routes[_stream.routeIndex].length > 0 ? routes[_stream.routeIndex][0] : _stream.payee
+            _stream.payee
         );
 
         // if the stream has ended delete it
@@ -241,31 +229,6 @@ contract StreamPay is AccessControl{
         } else {
             // updates on chain data
             gets[_payer][_id].sinceLast = block.timestamp;
-        }
-
-        if(routes[_stream.routeIndex].length > 0){
-            /*
-            if it is a custom contract
-            this allows for people to route funds though custom contracts
-            like if you want to swap it to something or deposit into another protocol or anything
-            #############################
-            ###RISK OF REENTRANCY HERE###
-            #############################
-            mby no risk of reentrancy as nothing else in the
-            contract after this relies on the contracts own internal state
-            */
-            // todo: need to re-write docs on this and example code
-            IcustomRouter(routes[_stream.routeIndex][0]).route(
-                coin.alAsset, // alusd
-                _stream.payee, // end reciver
-                _amount, // amount of alUSd its passing on
-            // todo: mby change this to the index but am not sure
-                routes[_stream.routeIndex], // the list of contrants the funds move through
-                1 // next index to look at
-            );
-
-            // ensures that the funds have moved on
-            require(0 == IERC20(coin.alAsset).balanceOf(routes[_stream.routeIndex][0]), "Coins did not move on");
         }
         emit STREAM_COLLECTED(_payer, _amount);
     }
@@ -426,21 +389,6 @@ contract StreamPay is AccessControl{
         // @pre_audit_checks mby do some interface checks?
         require((address(_alcV2vault) != address(0)) && (address(_alAsset) != address(0)));
         coinData[_index] = Coin(_alcV2vault, _alAsset, true);
-    }
-
-    /// @dev allows the admin to approve new coins to be used with streamPay
-    /// @param _route new route
-    /// @param _index index of the new
-    function setRouteIndex(
-        address[] memory _route,
-        uint256 _index
-    ) external {
-        // @pre_audit_checks mby do some interface checks?
-        require(hasRole(ROUTE_ADMIN, msg.sender), "router daddy only");
-        require(_index != 0, "cannot override the no route option");
-        // the only way you can edit a route is to kill it, reverting it back to its base state
-        require((routes[_index].length == 0) || (_route.length == 0), "cannot edit route");
-        routes[_index] = _route;
     }
 
     /// @notice returns the total payout for the stream

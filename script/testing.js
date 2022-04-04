@@ -37,7 +37,6 @@ const testing = async function() {
     // getting stuff up to plug into one another
     // into V2
     streamPay.setCoinIndex(v2.address, alAsset.address, 0);
-    streamPay.grantRole(await streamPay.ROUTE_ADMIN(), owner.address);
 
     return {
         streamPay,
