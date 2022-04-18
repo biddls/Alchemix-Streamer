@@ -10,14 +10,16 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SimpleSummedArrays} from "./SummedArrays/SimpleSummedArrays.sol";
 //import "hardhat/console.sol";
 
-//todo: take out routing system
 //todo: make sure events are working for everything
 //todo: look into errors instead of reverts
 //todo: remove comments between variables
-//todo: new streams go to new ID and old one points to it
 //todo: receiver can add people to admin of stream
 //todo: receiver can add remove them self
+//todo: update per-missions to allow an edited stream
+        //to retain its permissioned addresses
 //todo: add view functions to make looking up easy
+//todo: unify the whole to vs payee thing
+
 
 /// @title StreamPay
 /// @author Biddls.eth
@@ -54,6 +56,9 @@ contract StreamPay is AccessControl{
         uint8 reserveIndex;
         /// @dev denotes the index of the coin this stream handles
         uint8 coinIndex;
+        /* @dev this acts as a pointer to the new stream it is upto the implementor as to if they
+            want to auto adjust to it or not ignore it if its a 0*/
+        uint256 newStreamIndex;
     }
 
     /// @dev Struct that holds all the data about a reserved stream
@@ -108,13 +113,14 @@ contract StreamPay is AccessControl{
         uint256 _streamID = accountData[msg.sender].streams;
         // fills in the database about the stream
         gets[msg.sender][_streamID] = Stream(
-            _to, // payee
-            _cps, // cps
-            _start, // sinceLast
+            _to, // payee (receiver of funds)
+            _cps, // coins per second
+            _start, // since last
             _end, // end
-            "", // ROLE
-            maxIndex, // reserveIndex
-            _coinIndex // coinIndex
+            "", // role
+            maxIndex, // reserve index
+            _coinIndex, // coin index
+            0 // new stream index
         );
         // updates counter for total CPS payout
         accountData[msg.sender].totalCPS[_coinIndex] += _cps;
@@ -122,7 +128,10 @@ contract StreamPay is AccessControl{
         gets[msg.sender][_streamID].ROLE = genRole(
             msg.sender,
             _streamID,
-            gets[msg.sender][_streamID]);
+            _to,
+            _cps,
+            _end
+            );
         // sets the correct permissions for the stream
         grantRole(
             gets[msg.sender][_streamID].ROLE,
@@ -177,6 +186,81 @@ contract StreamPay is AccessControl{
         }
     }
 
+    /// @notice this allows the user to edit a stream
+    /// @dev it collects then closes the stream and then opens a new one, only the owner can edit a stream
+    /// @param _streamID holds the ID of the stream to be edited
+    /// @param _cps new coins per second
+    /// @param _end new end data
+    function editStream(
+        uint256 _streamID, // the stream that is going to be collected the closed
+        uint256 _cps, // coins per second
+        uint256 _end // 0 means no end
+    ) external {
+        // pre-edit checks
+
+        /// cant end before _start
+        require(_end == 0 || _end > block.timestamp, "Cant end before you have started, unless it never ends");
+
+        /// cant send 0 coins
+        require(_cps > 0, "should not stream 0 coins");
+
+        // collect stream
+        // note it doesnt delete it yet as this method allows you to 'extend a stream after its "closed"'
+        // ^ what i hope is safely...
+        _collectStream(
+            msg.sender,
+            _streamID,
+            gets[msg.sender][_streamID],
+            true
+        );
+
+        // build new stream struct
+        Stream memory _stream = gets[msg.sender][_streamID];
+
+        //// data points to change
+        /// stream.cps updates the payout rate
+        _stream.cps = _cps;
+        /// stream.end updates the end date
+        _stream.end = _end;
+        /// stream.ROLE gens a new role
+        // sets the role string that represents the role
+        _stream.ROLE = genRole(
+            msg.sender,
+            accountData[msg.sender].streams,
+            _stream.payee,
+            _cps,
+            _end
+        );
+
+        // sets the correct permissions for the stream
+        // any additional roles that existed prior will need to be migrated
+        // todo: mby add a way for old roles to still access the new stream
+        grantRole(
+            _stream.ROLE,
+            msg.sender);
+
+        /// write in the new stream
+        /// gets the next stream ID number
+        uint256 _streamID = accountData[msg.sender].streams;
+        gets[msg.sender][_streamID] = _stream;
+
+        /// update any reservation data
+        if(accountData[msg.sender].alive){
+            // remove old one
+            delete accountData[msg.sender].reservationData[_stream.reserveIndex][_stream.coinIndex];
+            // add stream to reservation data
+            accountData[msg.sender].reservationData[_stream.reserveIndex][_stream.coinIndex] = _streamID;
+        }
+
+        /// write in a new index in the old stream
+        // stream.newStreamIndex
+        delete gets[msg.sender][_streamID];
+        gets[msg.sender][_streamID].newStreamIndex = _streamID;
+
+        // increments the number of streams from that address (starting from a 0)
+        accountData[msg.sender].streams++;
+    }
+
     /// @notice Allows an approved address to collect a stream
     /// @param _payer the address that gives
     /// @param _id the ID of the stream
@@ -187,7 +271,13 @@ contract StreamPay is AccessControl{
         // stores local version of data to save gas
         Stream memory _stream = gets[_payer][_id];
         // ensuring that the address calling has the right to do so
-        require(hasRole(genRole(_payer, _id, _stream), msg.sender), "addr dont have access");
+        require(hasRole(genRole(
+                _payer,
+                _id,
+                _stream.payee,
+                _stream.cps,
+                _stream.end
+            ), msg.sender), "addr dont have access");
         // calls the internal unchecked version of collectStream
         _collectStream(_payer, _id, _stream, false);
     }
@@ -195,6 +285,8 @@ contract StreamPay is AccessControl{
     /// @dev internal function
     /// @param _payer the address that gives
     /// @param _id of the stream
+    /// @param _stream data
+    /// @param recursion bool that denotes if its in a recursion loop
     function _collectStream(
         address _payer,
         uint256 _id,
@@ -284,7 +376,17 @@ contract StreamPay is AccessControl{
         address _from
     ) view internal returns (bytes32){
         require(msg.sender != _from, "Stream owner must always have access");
-        return genRole(msg.sender, _id, gets[msg.sender][_id]);
+
+        // stores local version of data to save gas
+        Stream memory _stream = gets[_from][_id];
+
+        return genRole(
+            msg.sender, // todo: check this
+            _id,
+            _stream.payee,
+            _stream.cps,
+            _stream.end
+        );
     }
 
     /// @notice generates the role required for the account and subsequent stream
@@ -293,9 +395,11 @@ contract StreamPay is AccessControl{
     function genRole(
         address _from,
         uint256 _id,
-        Stream memory _stream
+        address _payee,
+        uint256 _cps,
+        uint256 _end
     ) pure internal returns (bytes32 _ROLE){
-        return keccak256(abi.encodePacked(_from, _id, _stream.payee, _stream.cps, _stream.end));
+        return keccak256(abi.encodePacked(_from, _id, _payee, _cps, _end));
     }
 
     /// @notice allows the user to reserve a stream
